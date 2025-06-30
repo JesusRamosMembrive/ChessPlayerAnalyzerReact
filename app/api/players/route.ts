@@ -5,6 +5,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http:localhost:8000"
 
 export async function GET() {
   try {
+
+    console.log("Fetching players from API...")
+    console.log("Attempting to connect to backend:", `${API_URL}/players`)
     console.log("Attempting to connect to backend:", `${API_URL}/players`)
 
     const response = await fetch(`${API_URL}/players`, {

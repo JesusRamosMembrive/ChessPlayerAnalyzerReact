@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://your-new-url-here.ngrok-free.app/"
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://8a4f-87-221-57-241.ngrok-free.app "
 
 export async function GET() {
   try {

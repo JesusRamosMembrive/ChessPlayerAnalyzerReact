@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { AbortSignal } from "abort-controller"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http:localhost:"
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http:localhost:8000"
 
 export async function GET() {
   try {

@@ -17,13 +17,7 @@ export async function GET() {
         ...(API_URL.includes("ngrok") && { "ngrok-skip-browser-warning": "true" }),
       },
       // Add cache control to prevent stale data
-      cache: "no-store",
-      // Add timeout using AbortController for better compatibility
-      signal: (() => {
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), 10000);
-        return controller.signal;
-      })()
+      cache: "no-store"
     })
 
     console.log("Backend response status:", response.status)

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { AbortSignal } from "abort-controller"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http:localhost:8000"
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://0152-87-221-57-241.ngrok-free.app"
 
 export async function GET() {
   try {
@@ -18,8 +18,12 @@ export async function GET() {
       },
       // Add cache control to prevent stale data
       cache: "no-store",
-      // Add timeout
-      signal: AbortSignal.timeout(10000), // 10 second timeout
+      // Add timeout using AbortController for better compatibility
+      signal: (() => {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 10000);
+        return controller.signal;
+      })()
     })
 
     console.log("Backend response status:", response.status)

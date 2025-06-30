@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
 import { AbortSignal } from "abort-controller"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://0152-87-221-57-241.ngrok-free.app"
+const API_URL = env.NEXT_PUBLIC_API_URL ?? "https://0152-87-221-57-241.ngrok-free.app"
+
+console.log("Attempting to connect to backend:", `${API_URL}/players`)
 
 export async function GET() {
   try {
@@ -17,7 +19,13 @@ export async function GET() {
         ...(API_URL.includes("ngrok") && { "ngrok-skip-browser-warning": "true" }),
       },
       // Add cache control to prevent stale data
-      cache: "no-store"
+      cache: "no-store",
+      // Add timeout using AbortController for better compatibility
+      signal: (() => {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 10000);
+        return controller.signal;
+      })()
     })
 
     console.log("Backend response status:", response.status)

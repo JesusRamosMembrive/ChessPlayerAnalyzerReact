@@ -8,8 +8,7 @@ export async function GET() {
 
     console.log("Fetching players from API...")
     console.log("Attempting to connect to backend:", `${API_URL}/players`)
-    console.log("Attempting to connect to backend:", `${API_URL}/players`)
-
+    
     const response = await fetch(`${API_URL}/players`, {
       headers: {
         Accept: "application/json",
@@ -46,6 +45,9 @@ export async function GET() {
 
     const data = await response.json()
     console.log("Successfully fetched players:", Array.isArray(data) ? data.length : "invalid format")
+    
+        console.log("API response status:", response.status)
+    console.log("Received data:", data)
 
     // Ensure we return an array
     if (!Array.isArray(data)) {

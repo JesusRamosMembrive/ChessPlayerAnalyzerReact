@@ -46,14 +46,10 @@ export async function GET() {
     const data = await response.json()
     console.log("Successfully fetched players:", Array.isArray(data) ? data.length : "invalid format")
     
-        console.log("API response status:", response.status)
+    console.log("API response status:", response.status)
     console.log("Received data:", data)
 
-    // Ensure we return an array
-    if (!Array.isArray(data)) {
-      console.warn("Backend returned non-array data:", typeof data)
-      return NextResponse.json([])
-    }
+
 
     return NextResponse.json(data)
   } catch (error: any) {

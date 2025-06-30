@@ -51,6 +51,7 @@ export async function GET() {
 
 
     return NextResponse.json(data)
+    
   } catch (error: any) {
     console.error("API route error:", error)
     console.error("Error details:", {

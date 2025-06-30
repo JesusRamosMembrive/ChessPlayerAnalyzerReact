@@ -4,9 +4,10 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { PlayerListItemSchema, type PlayerListItem } from "@/lib/types"
-import { History, User, Calendar, Globe, Zap } from "lucide-react"
+import { History, User, Calendar, RefreshCw, AlertCircle } from "lucide-react"
 
 interface PlayersListProps {
   onError?: (error: any) => void
@@ -15,84 +16,108 @@ interface PlayersListProps {
 export function PlayersList({ onError }: PlayersListProps) {
   const [players, setPlayers] = useState<PlayerListItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
   const { toast } = useToast()
 
-  useEffect(() => {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000) // 15s timeout
+  const fetchPlayers = async (showToast = true) => {
+    try {
+      setLoading(true)
+      setError(null)
 
-    const fetchPlayers = async () => {
+      console.log("Fetching players from API...")
+
+      const response = await fetch("/api/players", {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        // Add timeout for client-side request
+        signal: AbortSignal.timeout(15000), // 15 second timeout
+      })
+
+      console.log("API response status:", response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("API error response:", errorData)
+
+        throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log("Received data:", data)
+
+      // Handle empty array
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid response format: expected array")
+      }
+
+      if (data.length === 0) {
+        setPlayers([])
+        setError(null)
+        return
+      }
+
+      // Validate and parse the data
       try {
-        setLoading(true)
-        setPlayers([]) // Clear any existing data
-
-        // Use /api prefix for same-origin requests (Next.js API routes)
-        const response = await fetch("/api/players", {
-          signal: controller.signal,
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-        })
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-
-        const data = await response.json()
-
-        // Handle empty array
-        if (!Array.isArray(data)) {
-          throw new Error("Invalid response format: expected array")
-        }
-
-        if (data.length === 0) {
-          setPlayers([])
-          return
-        }
-
-        // Validate and parse the data
         const validatedPlayers = PlayerListItemSchema.array().parse(data)
         setPlayers(validatedPlayers)
-      } catch (error: any) {
-        console.error("Failed to fetch players:", error)
+        setError(null)
 
-        if (error.name === "AbortError") {
+        if (showToast && retryCount > 0) {
           toast({
-            title: "Request Timeout",
-            description: "Failed to load players: request timed out",
-            variant: "destructive",
-          })
-        } else if (error.message.includes("Failed to fetch")) {
-          // Network error - likely CORS or connection issue
-          toast({
-            title: "Connection Error",
-            description: "Unable to connect to the API. Please check if the backend is running.",
-            variant: "destructive",
-          })
-        } else {
-          toast({
-            title: "Error Loading Players",
-            description: error.message || "Failed to load analyzed players",
-            variant: "destructive",
+            title: "Connection Restored",
+            description: "Successfully loaded players",
           })
         }
-
-        onError?.(error)
-        setPlayers([])
-      } finally {
-        setLoading(false)
-        clearTimeout(timeoutId)
+      } catch (validationError) {
+        console.error("Data validation error:", validationError)
+        // Still show the data even if validation fails, but log the error
+        setPlayers(data)
+        setError(null)
       }
-    }
+    } catch (error: any) {
+      console.error("Failed to fetch players:", error)
 
-    fetchPlayers()
+      let errorMessage = "Failed to load players"
+      const shouldShowRetry = true
 
-    return () => {
-      controller.abort()
-      clearTimeout(timeoutId)
+      if (error.name === "AbortError" || error.name === "TimeoutError") {
+        errorMessage = "Request timed out - backend may be slow or unavailable"
+      } else if (error.message?.includes("Failed to fetch")) {
+        errorMessage = "Network error - unable to connect to API"
+      } else if (error.message?.includes("backend")) {
+        errorMessage = error.message
+      } else {
+        errorMessage = error.message || "Unknown error occurred"
+      }
+
+      setError(errorMessage)
+      setPlayers([])
+
+      if (showToast) {
+        toast({
+          title: "Error Loading Players",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      }
+
+      onError?.(error)
+    } finally {
+      setLoading(false)
     }
-  }, [onError, toast])
+  }
+
+  const handleRetry = () => {
+    setRetryCount((prev) => prev + 1)
+    fetchPlayers(true)
+  }
+
+  useEffect(() => {
+    fetchPlayers(false)
+  }, [])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -162,13 +187,48 @@ export function PlayersList({ onError }: PlayersListProps) {
   return (
     <Card className="bg-gray-800 border-gray-700">
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2 text-white">
-          <History className="w-5 h-5" />
-          <span>Analyzed Players</span>
+        <CardTitle className="flex items-center justify-between text-white">
+          <div className="flex items-center space-x-2">
+            <History className="w-5 h-5" />
+            <span>Analyzed Players</span>
+          </div>
+          {error && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRetry}
+              className="text-white border-gray-600 hover:bg-gray-700 bg-transparent"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {players.length === 0 ? (
+        {error ? (
+          <div className="text-center py-8">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-400" />
+            <p className="text-lg font-medium mb-2 text-red-400">Connection Error</p>
+            <p className="text-sm text-gray-400 mb-4">{error}</p>
+            <div className="space-y-2 text-xs text-gray-500">
+              <p>This usually means:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>The backend server is not running</li>
+                <li>The server URL has changed</li>
+                <li>Network connectivity issues</li>
+              </ul>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleRetry}
+              className="mt-4 text-white border-gray-600 hover:bg-gray-700 bg-transparent"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </Button>
+          </div>
+        ) : players.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
             <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p className="text-lg font-medium mb-2">No players analyzed</p>

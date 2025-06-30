@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { AbortSignal } from "abort-controller"
 
-const API_URL = "https://0152-87-221-57-241.ngrok-free.app"
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://0152-87-221-57-241.ngrok-free.app"
 
 export async function GET() {
   try {

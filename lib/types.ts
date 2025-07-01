@@ -1,87 +1,48 @@
 import { z } from "zod"
 
+// Schema for individual player list items, handling potential nulls
 export const PlayerListItemSchema = z.object({
-  username: z.string(),
-  task_id: z.string().optional().nullable(),
-  status: z.enum(["pending", "in_progress", "completed", "failed", "ready"]),
-  requested_at: z.string().datetime(),
-  finished_at: z.string().datetime().optional().nullable(),
-})
-
-export const PlayerListSchema = z.array(PlayerListItemSchema)
-
-export const TaskSchema = z.object({
-  task_id: z.string(),
-  status: z.string(),
-  progress: z.number(),
-  total: z.number(),
-  message: z.string(),
-})
-
-export const GameSchema = z.object({
   id: z.string(),
-  white: z.string(),
-  black: z.string(),
-  result: z.string(),
-  date: z.string(),
-  pgn: z.string(),
-})
-
-export const PlayerMetricsSchema = z.object({
   username: z.string(),
-  games_analyzed: z.number(),
-  avg_acpl: z.number(),
-  avg_match_rate: z.number(),
-  avg_ipr: z.number(),
-  step_function_detected: z.boolean(),
-  step_function_magnitude: z.number(),
-  risk_score: z.number(),
+  status: z.enum(["pending", "in_progress", "completed", "failed"]),
+  created_at: z.string(),
+  finished_at: z.string().nullable().optional(),
+  risk_score: z.number().nullable().optional(),
 })
 
-export const GameMetricsSchema = z.object({
-  game_id: z.string(),
-  acpl: z.number(),
-  match_rate: z.number(),
-  ipr: z.number(),
-})
+export type PlayerListItem = z.infer<typeof PlayerListItemSchema>
 
-export const PlayerSchema = z.object({
-  username: z.string(),
-  games_analyzed: z.number(),
-  last_analyzed: z.string().optional().nullable(),
-  status: z.string(),
-})
-
+// Schema for the detailed player metrics
 export const PlayerMetricsDetailSchema = z.object({
   username: z.string(),
+  analyzed_at: z.string(),
   games_analyzed: z.number(),
   first_game_date: z.string(),
   last_game_date: z.string(),
-  analyzed_at: z.string(),
   avg_acpl: z.number(),
   std_acpl: z.number(),
   avg_match_rate: z.number(),
   std_match_rate: z.number(),
   avg_ipr: z.number(),
-  selectivity_score: z.number(),
-  longest_streak: z.number(),
-  peer_delta_acpl: z.number(),
-  peer_delta_match: z.number(),
+  step_function_detected: z.boolean(),
+  step_function_magnitude: z.number(),
   roi_mean: z.number(),
   roi_max: z.number(),
   roi_std: z.number(),
-  step_function_detected: z.boolean(),
-  step_function_magnitude: z.number(),
-  performance: z.object({
-    roi_curve: z.array(z.number()),
-    trend_acpl: z.number(),
-    trend_match_rate: z.number(),
-  }),
+  longest_streak: z.number(),
+  selectivity_score: z.number(),
+  peer_delta_acpl: z.number(),
+  peer_delta_match: z.number(),
   risk: z.object({
     risk_score: z.number(),
     confidence_level: z.number(),
     suspicious_games_count: z.number(),
     risk_factors: z.record(z.number()),
+  }),
+  performance: z.object({
+    roi_curve: z.array(z.number()),
+    trend_acpl: z.number(),
+    trend_match_rate: z.number(),
   }),
   opening_patterns: z.object({
     mean_entropy: z.number(),
@@ -120,10 +81,4 @@ export const PlayerMetricsDetailSchema = z.object({
   }),
 })
 
-export type PlayerListItem = z.infer<typeof PlayerListItemSchema>
 export type PlayerMetricsDetail = z.infer<typeof PlayerMetricsDetailSchema>
-export type Player = z.infer<typeof PlayerSchema>
-export type Task = z.infer<typeof TaskSchema>
-export type Game = z.infer<typeof GameSchema>
-export type PlayerMetrics = z.infer<typeof PlayerMetricsSchema>
-export type GameMetrics = z.infer<typeof GameMetricsSchema>

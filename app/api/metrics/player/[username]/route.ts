@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-// Use a specific env var for the Python backend, with a fallback
-const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL ?? "https://8a4f-87-221-57-241.ngrok-free.app/"
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://8a4f-87-221-57-241.ngrok-free.app/"
 
 export async function GET(request: NextRequest, { params }: { params: { username: string } }) {
   try {
@@ -11,7 +10,11 @@ export async function GET(request: NextRequest, { params }: { params: { username
       return NextResponse.json({ error: "Username is required" }, { status: 400 })
     }
 
-    const backendUrl = `${PYTHON_BACKEND_URL.replace(/\/$/, "")}/metrics/player/${username}`
+    console.log(`Fetching metrics for player: ${username}`)
+    console.log(`API URL: ${API_URL}`)
+
+    const backendUrl = `${API_URL.replace(/\/$/, "")}/metrics/player/${username}`
+    console.log(`Full backend URL: ${backendUrl}`)
 
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
@@ -21,6 +24,7 @@ export async function GET(request: NextRequest, { params }: { params: { username
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
+        // Add ngrok-specific headers to bypass browser warnings
         "ngrok-skip-browser-warning": "true",
         "User-Agent": "NextJS-API-Route",
       },
@@ -29,9 +33,11 @@ export async function GET(request: NextRequest, { params }: { params: { username
 
     clearTimeout(timeoutId)
 
+    console.log(`Backend response status: ${response.status}`)
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => "Unknown error")
-      console.error(`Backend error response from ${backendUrl}: ${errorText}`)
+      console.error(`Backend error response: ${errorText}`)
 
       if (response.status === 404) {
         return NextResponse.json({ error: `Player '${username}' not found or not analyzed yet` }, { status: 404 })
@@ -47,9 +53,11 @@ export async function GET(request: NextRequest, { params }: { params: { username
     }
 
     const data = await response.json()
+    console.log(`Player metrics data received:`, data)
+
     return NextResponse.json(data)
   } catch (error: any) {
-    console.error("Error in API route /api/metrics/player/[username]:", error)
+    console.error("Error fetching player metrics:", error)
 
     if (error.name === "AbortError") {
       return NextResponse.json({ error: "Request timeout - backend may be slow or unavailable" }, { status: 408 })

@@ -134,29 +134,35 @@ export function PlayersList({
           )}
           {data &&
             data.map((player) => (
-              <div key={player.username} className="p-3 bg-gray-700/50 rounded-lg">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-bold text-white">{player.username}</span>
-                  {renderPlayerStatus(player)}
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Progress value={player.progress || 0} className="w-full [&>div]:bg-blue-500" />
-                  <span className="text-sm text-gray-300 w-24 text-right">
-                    {player.done_games}/{player.total_games || "?"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
-                  <span>Requested {formatDistanceToNow(new Date(player.requested_at), { addSuffix: true })}</span>
-                  {player.status === "completed" && (
-                    <Link href={`/results?username=${player.username}`} passHref>
+              <Link
+                key={player.username}
+                href={player.status === "completed" ? `/results?username=${player.username}` : "#"}
+                passHref
+                className={player.status === "completed" ? "block" : undefined}
+                style={{ pointerEvents: player.status === "completed" ? "auto" : "none" }}
+              >
+                <div className="p-3 bg-gray-700/50 rounded-lg hover:bg-gray-600 transition-colors">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-bold text-white">{player.username}</span>
+                    {renderPlayerStatus(player)}
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Progress value={player.progress || 0} className="w-full [&>div]:bg-blue-500" />
+                    <span className="text-sm text-gray-300 w-24 text-right">
+                      {player.done_games}/{player.total_games || "?"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
+                    <span>Requested {formatDistanceToNow(new Date(player.requested_at), { addSuffix: true })}</span>
+                    {player.status === "completed" && (
                       <Button variant="link" className="h-auto p-0 text-blue-400 hover:text-blue-300">
                         View Results
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </Button>
-                    </Link>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
+              </Link>
             ))}
         </div>
       </CardContent>

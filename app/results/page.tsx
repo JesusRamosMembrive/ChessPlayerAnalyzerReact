@@ -29,7 +29,7 @@ import type { PlayerMetricsDetail } from "@/lib/types"
 import { MetricDisplay } from "./components/metric-display"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Progress } from "@/components/ui/progress"
-import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
+import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts"
 
 // Helper to format numbers
 const formatNumber = (num: number, decimals = 2) => {
@@ -103,9 +103,30 @@ export default function AnalysisResults() {
   const phaseQualityData = useMemo(() => {
     if (!metrics?.phase_quality) return []
     return [
-      { name: "Apertura", acpl: metrics.phase_quality.opening_acpl },
-      { name: "Medio Juego", acpl: metrics.phase_quality.middlegame_acpl },
-      { name: "Final", acpl: metrics.phase_quality.endgame_acpl },
+      { 
+        name: "Apertura", 
+        acpl: metrics.phase_quality.opening_acpl,
+        fill: "#8b5cf6"
+      },
+      { 
+        name: "Medio Juego", 
+        acpl: metrics.phase_quality.middlegame_acpl,
+        fill: "#06b6d4"
+      },
+      { 
+        name: "Final", 
+        acpl: metrics.phase_quality.endgame_acpl,
+        fill: "#10b981"
+      },
+    ]
+  }, [metrics])
+
+  const blunderData = useMemo(() => {
+    if (!metrics?.phase_quality) return []
+    const blunderRate = metrics.phase_quality.blunder_rate * 100
+    return [
+      { name: "Errores Graves", value: blunderRate, fill: "#ef4444" },
+      { name: "Jugadas Normales", value: 100 - blunderRate, fill: "#6b7280" }
     ]
   }, [metrics])
 
@@ -466,26 +487,112 @@ export default function AnalysisResults() {
               Análisis del rendimiento (ACPL) en cada fase de la partida.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={phaseQualityData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
-                  <XAxis dataKey="name" stroke="#ffffff" />
-                  <YAxis stroke="#ffffff" />
+          <CardContent className="space-y-6">
+            <div className="bg-gray-900/50 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-gray-300 mb-3">ACPL por Fase de Juego</h4>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={phaseQualityData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="colorApertura" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                    </linearGradient>
+                    <linearGradient id="colorMedio" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.3}/>
+                    </linearGradient>
+                    <linearGradient id="colorFinal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.3}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" stroke="#d1d5db" fontSize={12} />
+                  <YAxis stroke="#d1d5db" fontSize={12} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#000000",
+                      backgroundColor: "#111827",
                       border: "1px solid #374151",
                       borderRadius: "8px",
                       color: "#ffffff",
                     }}
+                    formatter={(value) => [`${formatNumber(value as number)} cp`, "ACPL"]}
                   />
-                  <Bar dataKey="acpl" name="ACPL" fill="#818cf8" />
+                  <Bar dataKey="acpl" name="ACPL" fill="url(#colorApertura)" radius={[4, 4, 0, 0]}>
+                    {phaseQualityData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={`url(#color${index === 0 ? 'Apertura' : index === 1 ? 'Medio' : 'Final'})`} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="space-y-4 flex flex-col justify-center">
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-gray-900/50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-300 mb-3">Distribución de Pérdidas por Fase</h4>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={phaseQualityData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="acpl"
+                    >
+                      {phaseQualityData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#111827",
+                        border: "1px solid #374151",
+                        borderRadius: "8px",
+                        color: "#ffffff",
+                      }}
+                      formatter={(value) => [`${formatNumber(value as number)} cp`, "ACPL"]}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-gray-900/50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-300 mb-3">Tasa de Errores Graves</h4>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={blunderData}
+                      cx="50%"
+                      cy="50%"
+                      startAngle={90}
+                      endAngle={450}
+                      innerRadius={50}
+                      outerRadius={80}
+                      dataKey="value"
+                    >
+                      {blunderData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#111827",
+                        border: "1px solid #374151",
+                        borderRadius: "8px",
+                        color: "#ffffff",
+                      }}
+                      formatter={(value) => [`${formatNumber(value as number)}%`, ""]}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <MetricDisplay
                 label="ACPL en Apertura"
                 value={formatNumber(metrics.phase_quality.opening_acpl)}

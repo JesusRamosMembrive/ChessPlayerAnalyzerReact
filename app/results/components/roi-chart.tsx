@@ -14,14 +14,14 @@ const formatNumber = (num: number, decimals = 0) => {
 export function RoiChart({ data }: RoiChartProps) {
   if (!data || data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[300px] text-gray-500">
+      <div className="flex items-center justify-center h-full text-gray-500">
         No hay datos de ROI disponibles para mostrar el gráfico.
       </div>
     )
   }
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={data}>
         <defs>
           <linearGradient id="roiGradient" x1="0" y1="0" x2="0" y2="1">

@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -107,6 +107,23 @@ export default function AnalysisResults() {
     fetchMetrics()
   }, [selectedUser, router])
 
+  const roiChartData = useMemo(() => {
+    if (!metrics?.performance?.roi_curve) return []
+    return metrics.performance.roi_curve.map((roi, index) => ({
+      month: index + 1,
+      roi: roi,
+    }))
+  }, [metrics])
+
+  const phaseQualityData = useMemo(() => {
+    if (!metrics?.phase_quality) return []
+    return [
+      { name: "Apertura", acpl: metrics.phase_quality.opening_acpl },
+      { name: "Medio Juego", acpl: metrics.phase_quality.middlegame_acpl },
+      { name: "Final", acpl: metrics.phase_quality.endgame_acpl },
+    ]
+  }, [metrics])
+
   if (isLoading) {
     return <ResultsSkeleton />
   }
@@ -138,17 +155,6 @@ export default function AnalysisResults() {
   }
 
   const riskScoreColor = getRiskColor(metrics.risk.risk_score)
-
-  const roiChartData = metrics.performance.roi_curve.map((roi, index) => ({
-    month: index + 1,
-    roi: roi,
-  }))
-
-  const phaseQualityData = [
-    { name: "Apertura", acpl: metrics.phase_quality.opening_acpl },
-    { name: "Medio Juego", acpl: metrics.phase_quality.middlegame_acpl },
-    { name: "Final", acpl: metrics.phase_quality.endgame_acpl },
-  ]
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -326,7 +332,9 @@ export default function AnalysisResults() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <RoiChart data={roiChartData} />
+              <div className="w-full h-[300px]">
+                <RoiChart data={roiChartData} />
+              </div>
               {/* ROI Statistics */}
               <div className="mt-4 grid grid-cols-3 gap-4">
                 <div className="text-center p-3 bg-gray-700/30 rounded-lg">

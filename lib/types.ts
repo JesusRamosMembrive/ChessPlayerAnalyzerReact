@@ -67,7 +67,7 @@ export const PlayerListItemSchema = z.object({
   total_games: z.number().optional(),
   done_games: z.number().optional(),
   requested_at: z.string(),
-  finished_at: z.string().optional(),
+  finished_at: z.string().optional().nullable(), // Allow null values
   error: z.string().optional().nullable(),
 })
 

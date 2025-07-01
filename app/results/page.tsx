@@ -128,11 +128,15 @@ export default function AnalysisResults() {
   }
 
   const riskScoreColor = getRiskColor(metrics.risk.risk_score)
+
+  // Prepare ROI chart data
   const roiChartData = metrics.performance.roi_curve.map((roi, index) => ({
     month: index + 1,
     roi: roi,
     trend: metrics.performance.trend_acpl ? metrics.performance.trend_acpl * (index + 1) : 0,
   }))
+
+  // Prepare phase quality data
   const phaseQualityData = [
     { name: "Apertura", acpl: metrics.phase_quality.opening_acpl },
     { name: "Medio Juego", acpl: metrics.phase_quality.middlegame_acpl },

@@ -11,41 +11,40 @@ export async function GET(request: NextRequest, { params }: { params: { username
     }
 
     console.log(`Fetching metrics for player: ${username}`)
-    console.log(`API URL: ${API_URL}`)
+    console.log("Attempting to connect to backend:", `${API_URL}/metrics/player/${username}`)
 
-    const backendUrl = `${API_URL.replace(/\/$/, "")}/metrics/player/${username}`
-    console.log(`Full backend URL: ${backendUrl}`)
-
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
-
-    const response = await fetch(backendUrl, {
-      method: "GET",
+    const response = await fetch(`${API_URL}/metrics/player/${username}`, {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        // Add ngrok-specific headers to bypass browser warnings
-        "ngrok-skip-browser-warning": "true",
-        "User-Agent": "NextJS-API-Route",
+        // Add ngrok bypass header if using ngrok
+        ...(API_URL.includes("ngrok") && { "ngrok-skip-browser-warning": "true" }),
       },
-      signal: controller.signal,
+      // Add cache control to prevent stale data
+      cache: "no-store",
+      // Add timeout using AbortController for better compatibility
+      signal: (() => {
+        const controller = new AbortController()
+        setTimeout(() => controller.abort(), 10000)
+        return controller.signal
+      })(),
     })
 
-    clearTimeout(timeoutId)
-
-    console.log(`Backend response status: ${response.status}`)
+    console.log("Backend response status:", response.status)
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "Unknown error")
-      console.error(`Backend error response: ${errorText}`)
+      console.error(`Backend API error: ${response.status} ${response.statusText}`, errorText)
 
+      // Return 404 for metrics not found
       if (response.status === 404) {
-        return NextResponse.json({ error: `Player '${username}' not found or not analyzed yet` }, { status: 404 })
+        return NextResponse.json({ error: "Player metrics not found" }, { status: 404 })
       }
 
       return NextResponse.json(
         {
-          error: `Backend error: ${response.status} ${response.statusText}`,
+          error: "Failed to fetch player metrics",
+          status: response.status,
           details: errorText,
         },
         { status: response.status },
@@ -53,20 +52,36 @@ export async function GET(request: NextRequest, { params }: { params: { username
     }
 
     const data = await response.json()
-    console.log(`Player metrics data received:`, data)
+    console.log("Successfully fetched player metrics:", data)
 
     return NextResponse.json(data)
   } catch (error: any) {
-    console.error("Error fetching player metrics:", error)
+    console.error("API route error:", error)
+    console.error("Error details:", {
+      name: error.name,
+      message: error.message,
+      cause: error.cause,
+    })
 
-    if (error.name === "AbortError") {
-      return NextResponse.json({ error: "Request timeout - backend may be slow or unavailable" }, { status: 408 })
+    // Handle different types of errors
+    let errorMessage = "Unable to connect to backend API"
+    let statusCode = 503
+
+    if (error.name === "AbortError" || error.name === "TimeoutError") {
+      errorMessage = "Backend API request timed out"
+      statusCode = 504
+    } else if (error.message?.includes("fetch")) {
+      errorMessage = "Network error connecting to backend API"
     }
 
-    if (error.message?.includes("fetch")) {
-      return NextResponse.json({ error: "Unable to connect to backend server" }, { status: 503 })
-    }
-
-    return NextResponse.json({ error: "Internal server error", details: error.message }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: errorMessage,
+        details: error.message,
+        backend_url: `${API_URL}/metrics/player/${params.username}`,
+        suggestion: "Please ensure the backend server is running and accessible",
+      },
+      { status: statusCode },
+    )
   }
 }

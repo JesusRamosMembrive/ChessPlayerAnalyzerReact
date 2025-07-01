@@ -9,7 +9,7 @@ interface MetricDisplayProps {
 
 export function MetricDisplay({ label, value, tooltipText }: MetricDisplayProps) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-2">
       <div className="flex items-center space-x-2">
         <p className="text-sm text-gray-300">{label}</p>
         <TooltipProvider>

@@ -29,7 +29,8 @@ import type { PlayerMetricsDetail } from "@/lib/types"
 import { MetricDisplay } from "./components/metric-display"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Progress } from "@/components/ui/progress"
-import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
 
 // Helper to format numbers
 const formatNumber = (num: number, decimals = 2) => {
@@ -129,6 +130,32 @@ export default function AnalysisResults() {
       { name: "Jugadas Normales", value: 100 - blunderRate, fill: "#6b7280" }
     ]
   }, [metrics])
+
+  const phaseQualityChartConfig = {
+    apertura: {
+      label: "Apertura",
+      color: "#8b5cf6",
+    },
+    medioJuego: {
+      label: "Medio Juego", 
+      color: "#06b6d4",
+    },
+    final: {
+      label: "Final",
+      color: "#10b981",
+    },
+  }
+
+  const blunderChartConfig = {
+    erroresGraves: {
+      label: "Errores Graves",
+      color: "#ef4444",
+    },
+    jugadasNormales: {
+      label: "Jugadas Normales",
+      color: "#6b7280",
+    },
+  }
 
   if (isLoading) {
     return <ResultsSkeleton />
@@ -490,47 +517,25 @@ export default function AnalysisResults() {
           <CardContent className="space-y-6">
             <div className="bg-gray-900/50 rounded-lg p-4">
               <h4 className="text-sm font-medium text-gray-300 mb-3">ACPL por Fase de Juego</h4>
-              <ResponsiveContainer width="100%" height={350}>
+              <ChartContainer config={phaseQualityChartConfig} className="h-[350px] w-full">
                 <BarChart data={phaseQualityData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <defs>
-                    <linearGradient id="colorApertura" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                    </linearGradient>
-                    <linearGradient id="colorMedio" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.3}/>
-                    </linearGradient>
-                    <linearGradient id="colorFinal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.3}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="name" stroke="#d1d5db" fontSize={12} />
-                  <YAxis stroke="#d1d5db" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#111827",
-                      border: "1px solid #374151",
-                      borderRadius: "8px",
-                      color: "#ffffff",
-                    }}
-                    formatter={(value) => [`${formatNumber(value as number)} cp`, "ACPL"]}
-                  />
-                  <Bar dataKey="acpl" name="ACPL" fill="url(#colorApertura)" radius={[4, 4, 0, 0]}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="acpl" name="ACPL" radius={[4, 4, 0, 0]}>
                     {phaseQualityData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={`url(#color${index === 0 ? 'Apertura' : index === 1 ? 'Medio' : 'Final'})`} />
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-gray-900/50 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-gray-300 mb-3">Distribución de Pérdidas por Fase</h4>
-                <ResponsiveContainer width="100%" height={250}>
+                <ChartContainer config={phaseQualityChartConfig} className="h-[250px] w-full">
                   <PieChart>
                     <Pie
                       data={phaseQualityData}
@@ -545,23 +550,15 @@ export default function AnalysisResults() {
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#111827",
-                        border: "1px solid #374151",
-                        borderRadius: "8px",
-                        color: "#ffffff",
-                      }}
-                      formatter={(value) => [`${formatNumber(value as number)} cp`, "ACPL"]}
-                    />
-                    <Legend />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartLegend content={<ChartLegendContent />} />
                   </PieChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </div>
 
               <div className="bg-gray-900/50 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-gray-300 mb-3">Tasa de Errores Graves</h4>
-                <ResponsiveContainer width="100%" height={250}>
+                <ChartContainer config={blunderChartConfig} className="h-[250px] w-full">
                   <PieChart>
                     <Pie
                       data={blunderData}
@@ -577,18 +574,10 @@ export default function AnalysisResults() {
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#111827",
-                        border: "1px solid #374151",
-                        borderRadius: "8px",
-                        color: "#ffffff",
-                      }}
-                      formatter={(value) => [`${formatNumber(value as number)}%`, ""]}
-                    />
-                    <Legend />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartLegend content={<ChartLegendContent />} />
                   </PieChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </div>
             </div>
 

@@ -1,12 +1,11 @@
 "use client"
-
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 interface RoiChartProps {
   data: { name: string; roi: number }[]
 }
 
-export default function RoiChart({ data }: RoiChartProps) {
+export function RoiChart({ data }: RoiChartProps) {
   if (!data || data.length === 0) {
     return <div className="flex items-center justify-center h-full text-gray-500">No ROI data available.</div>
   }
@@ -28,18 +27,22 @@ export default function RoiChart({ data }: RoiChartProps) {
             <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
-        <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-        <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
+        <XAxis dataKey="name" stroke="#ffffff" />
+        <YAxis stroke="#ffffff" />
         <Tooltip
           contentStyle={{
             backgroundColor: "#1f2937",
-            borderColor: "#374151",
-            color: "#ffffff",
+            border: "1px solid #374151",
+            borderRadius: "0.5rem",
           }}
+          labelStyle={{ color: "#d1d5db" }}
+          itemStyle={{ color: "#10b981" }}
         />
         <Area type="monotone" dataKey="roi" stroke="#10b981" fillOpacity={1} fill="url(#colorRoi)" />
       </AreaChart>
     </ResponsiveContainer>
   )
 }
+
+export default RoiChart

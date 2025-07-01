@@ -1,21 +1,37 @@
 "use client"
+import { useEffect, useState, useMemo, Suspense } from "react"
 import dynamic from "next/dynamic"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { ShieldCheck, BrainCircuit, LineChartIcon, Zap, AlertCircle } from "lucide-react"
+import {
+  ArrowLeft,
+  Download,
+  Share2,
+  AlertTriangle,
+  TrendingUp,
+  BarChart3,
+  User,
+  ShieldCheck,
+  Gauge,
+  LineChartIcon,
+} from "lucide-react"
+import { useSearchParams, useRouter } from "next/navigation"
 import type { PlayerMetricsDetail } from "@/lib/types"
 import { MetricDisplay } from "./components/metric-display"
-import ResultsPageLoading from "./loading"
-import { Suspense } from "react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Progress } from "@/components/ui/progress"
 
-// Dynamically import the chart component with SSR disabled
 const RoiChart = dynamic(() => import("./components/roi-chart"), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center h-full text-gray-500">Loading Chart...</div>,
+  loading: () => (
+    <div className="flex items-center justify-center h-full w-full">
+      <Skeleton className="h-full w-full bg-gray-700" />
+    </div>
+  ),
 })
 
 // Helper to format numbers
-const formatNumber = (num: number, decimals = 2) => {
+const formatNumber = (num: number | null | undefined, decimals = 2) => {
   if (num === null || num === undefined) return "N/A"
   return num.toFixed(decimals)
 }
@@ -47,201 +63,345 @@ const getPercentileDescription = (percentile: number) => {
   return "Bajo (Bottom 25%)"
 }
 
-async function getPlayerData(username: string): Promise<PlayerMetricsDetail | null> {
-  try {
-    const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/metrics/player/${username}`
-    const res = await fetch(apiUrl, {
-      next: { revalidate: 60 }, // Revalidate every 60 seconds
-    })
+function ResultsPageContent({ username }: { username: string }) {
+  const router = useRouter()
+  const [metrics, setMetrics] = useState<PlayerMetricsDetail | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-    if (!res.ok) {
-      console.error(`API Error fetching ${apiUrl}: ${res.status} ${res.statusText}`)
-      return null
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        // Call the internal Next.js API route
+        const response = await fetch(`/api/metrics/player/${username}`)
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || `Failed to fetch player metrics (${response.status})`)
+        }
+        const data: PlayerMetricsDetail = await response.json()
+        setMetrics(data)
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setIsLoading(false)
+      }
     }
-    return res.json()
-  } catch (error) {
-    console.error("Fetch Error:", error)
-    return null
+
+    fetchMetrics()
+  }, [username])
+
+  const roiChartData = useMemo(() => {
+    if (!metrics?.performance?.roi_curve) return []
+    return metrics.performance.roi_curve.map((roi, index) => ({
+      name: `G${index + 1}`,
+      roi: roi,
+    }))
+  }, [metrics])
+
+  const phaseQualityData = useMemo(() => {
+    if (!metrics?.phase_quality) return []
+    return [
+      { name: "Apertura", acpl: metrics.phase_quality.opening_acpl },
+      { name: "Medio Juego", acpl: metrics.phase_quality.middlegame_acpl },
+      { name: "Final", acpl: metrics.phase_quality.endgame_acpl },
+    ]
+  }, [metrics])
+
+  if (isLoading) {
+    return <ResultsSkeleton />
   }
-}
 
-export default function ResultsPage({
-  searchParams,
-}: {
-  searchParams: { user?: string }
-}) {
-  const username = searchParams.user
-
-  if (!username) {
+  if (error) {
     return (
-      <div className="flex items-center justify-center h-full p-4">
-        <Alert variant="destructive" className="max-w-md">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>No player username provided. Please go back and select a player.</AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
+        <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Error al cargar los datos</h2>
+        <p className="text-gray-400 mb-6 text-center">{error}</p>
+        <Button onClick={() => router.push("/")}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Volver al inicio
+        </Button>
       </div>
     )
   }
 
+  if (!metrics) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
+        <h2 className="text-2xl font-bold mb-2">No hay datos disponibles para este jugador</h2>
+        <Button onClick={() => router.push("/")}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Volver al inicio
+        </Button>
+      </div>
+    )
+  }
+
+  const riskScoreColor = getRiskColor(metrics.risk.risk_score)
+
   return (
-    <Suspense fallback={<ResultsPageLoading username={username} />}>
-      <PlayerResults username={username} />
+    <div className="min-h-screen bg-black text-white">
+      {/* Header */}
+      <header className="border-b border-gray-800 bg-black/50 backdrop-blur-sm sticky top-0 z-10">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" size="sm" onClick={() => router.push("/")}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Volver
+              </Button>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+                  <User className="w-5 h-5" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold">{metrics.username}</h1>
+                  <p className="text-sm text-gray-400">
+                    Análisis completado el {new Date(metrics.analyzed_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm">
+                <Share2 className="w-4 h-4 mr-2" />
+                Compartir
+              </Button>
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4 mr-2" />
+                Exportar
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-6 py-8">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Puntuación de Riesgo</CardTitle>
+              <ShieldCheck className={`w-5 h-5 ${riskScoreColor}`} />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-4xl font-bold ${riskScoreColor}`}>
+                {formatNumber(metrics.risk.risk_score, 0)}/100
+              </div>
+              <p className="text-xs text-gray-500">Evaluación general de sospecha</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Partidas Analizadas</CardTitle>
+              <BarChart3 className="w-5 h-5 text-blue-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">{metrics.games_analyzed}</div>
+              <p className="text-xs text-gray-500">
+                Del {new Date(metrics.first_game_date).toLocaleDateString()} al{" "}
+                {new Date(metrics.last_game_date).toLocaleDateString()}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Rendimiento Intrínseco</CardTitle>
+              <Gauge className="w-5 h-5 text-purple-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">{formatNumber(metrics.avg_ipr, 0)}</div>
+              <p className="text-xs text-gray-500">ELO estimado según sus jugadas</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Mejora Súbita</CardTitle>
+              <TrendingUp className="w-5 h-5 text-orange-400" />
+            </CardHeader>
+            <CardContent>
+              <div
+                className={`text-4xl font-bold ${metrics.step_function_detected ? "text-orange-400" : "text-green-400"}`}
+              >
+                {metrics.step_function_detected ? "Detectada" : "No"}
+              </div>
+              <p className="text-xs text-gray-500">Magnitud: {formatNumber(metrics.step_function_magnitude, 0)}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Second Block of Metrics - Improved ROI Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <Card className="lg:col-span-2 bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <LineChartIcon className="mr-2 text-green-400" /> Análisis Longitudinal (ROI)
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Evolución del rendimiento del jugador a lo largo del tiempo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="w-full h-[300px]">
+                <RoiChart data={roiChartData} />
+              </div>
+              {/* ROI Statistics */}
+              <div className="mt-4 grid grid-cols-3 gap-4">
+                <div className="text-center p-3 bg-gray-700/30 rounded-lg">
+                  <p className="text-xs text-gray-400 mb-1">ROI Medio</p>
+                  <p className="text-lg font-semibold text-green-400">{formatNumber(metrics.roi_mean, 0)}</p>
+                </div>
+                <div className="text-center p-3 bg-gray-700/30 rounded-lg">
+                  <p className="text-xs text-gray-400 mb-1">ROI Máximo</p>
+                  <p className="text-lg font-semibold text-blue-400">{formatNumber(metrics.roi_max, 0)}</p>
+                </div>
+                <div className="text-center p-3 bg-gray-700/30 rounded-lg">
+                  <p className="text-xs text-gray-400 mb-1">Desviación ROI</p>
+                  <p className="text-lg font-semibold text-purple-400">{formatNumber(metrics.roi_std, 0)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <TrendingUp className="mr-2 text-orange-400" /> Tendencias
+              </CardTitle>
+              <CardDescription className="text-gray-400">Análisis de tendencias temporales.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <MetricDisplay
+                  title="Tendencia ACPL"
+                  value={`${formatNumber(metrics.performance.trend_acpl)} cp/100 partidas`}
+                  tooltipText="Cambio en ACPL por cada 100 partidas. Valores negativos indican mejora."
+                />
+                <div className="mt-2">
+                  <Progress value={Math.min(Math.abs(metrics.performance.trend_acpl) / 10, 100)} className="h-2" />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {metrics.performance.trend_acpl < -50
+                      ? "Mejora significativa"
+                      : metrics.performance.trend_acpl < 0
+                        ? "Mejora gradual"
+                        : metrics.performance.trend_acpl < 50
+                          ? "Estable"
+                          : "Empeoramiento"}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <MetricDisplay
+                  title="Tendencia Match Rate"
+                  value={`${formatNumber(metrics.performance.trend_match_rate * 100)}%/100 partidas`}
+                  tooltipText="Cambio en tasa de coincidencia por cada 100 partidas."
+                />
+                <div className="mt-2">
+                  <Progress
+                    value={Math.min(Math.abs(metrics.performance.trend_match_rate) * 1000, 100)}
+                    className="h-2"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {metrics.performance.trend_match_rate > 0.05
+                      ? "Aumento significativo"
+                      : metrics.performance.trend_match_rate > 0
+                        ? "Aumento gradual"
+                        : metrics.performance.trend_match_rate > -0.05
+                          ? "Estable"
+                          : "Disminución"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-gray-700">
+                <div className="text-center">
+                  <p className="text-sm text-gray-400 mb-2">Evaluación de Tendencia</p>
+                  <div
+                    className={`text-2xl font-bold ${
+                      metrics.performance.trend_acpl < -100 && metrics.performance.trend_match_rate > 0.02
+                        ? "text-red-400"
+                        : metrics.performance.trend_acpl < -50
+                          ? "text-orange-400"
+                          : "text-green-400"
+                    }`}
+                  >
+                    {metrics.performance.trend_acpl < -100 && metrics.performance.trend_match_rate > 0.02
+                      ? "⚠️ Sospechoso"
+                      : metrics.performance.trend_acpl < -50
+                        ? "📈 Mejorando"
+                        : "✅ Normal"}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+function ResultsSkeleton() {
+  return (
+    <div className="min-h-screen bg-black text-white p-6">
+      <header className="border-b border-gray-800 bg-black/50 backdrop-blur-sm sticky top-0 z-10 mb-8">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Skeleton className="h-8 w-32 bg-gray-700" />
+            <div className="flex items-center space-x-3">
+              <Skeleton className="h-10 w-10 rounded-full bg-gray-700" />
+              <div>
+                <Skeleton className="h-6 w-40 mb-1 bg-gray-700" />
+                <Skeleton className="h-4 w-24 bg-gray-700" />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Skeleton className="h-8 w-24 bg-gray-700" />
+            <Skeleton className="h-8 w-24 bg-gray-700" />
+          </div>
+        </div>
+      </header>
+      <main className="container mx-auto px-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Skeleton className="h-32 rounded-lg bg-gray-800" />
+          <Skeleton className="h-32 rounded-lg bg-gray-800" />
+          <Skeleton className="h-32 rounded-lg bg-gray-800" />
+          <Skeleton className="h-32 rounded-lg bg-gray-800" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <Skeleton className="h-96 lg:col-span-2 rounded-lg bg-gray-800" />
+          <Skeleton className="h-96 rounded-lg bg-gray-800" />
+        </div>
+      </main>
+    </div>
+  )
+}
+
+export default function ResultsPageWrapper() {
+  return (
+    <Suspense fallback={<ResultsSkeleton />}>
+      <ResultsPage />
     </Suspense>
   )
 }
 
-async function PlayerResults({ username }: { username: string }) {
-  const data = await getPlayerData(username)
+function ResultsPage() {
+  const searchParams = useSearchParams()
+  const username = searchParams.get("user")
 
-  if (!data) {
+  if (!username) {
     return (
-      <div className="flex items-center justify-center h-full p-4">
-        <Alert variant="destructive" className="max-w-md">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error Loading Data</AlertTitle>
-          <AlertDescription>
-            Could not load analysis results for <strong>{username}</strong>. The backend might be down or the analysis
-            is not complete.
-          </AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
+        <AlertTriangle className="w-16 h-16 text-yellow-500 mb-4" />
+        <h2 className="text-2xl font-bold mb-2">No se especificó un jugador</h2>
+        <p className="text-gray-400">Por favor, vuelve y selecciona un jugador para ver el análisis.</p>
       </div>
     )
   }
 
-  const roiChartData = data.performance.roi_curve.map((value, index) => ({
-    name: `G${index + 1}`,
-    roi: value,
-  }))
-
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleDateString()
-    } catch {
-      return "Invalid Date"
-    }
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <header>
-          <h1 className="text-3xl font-bold tracking-tight">Analysis Report: {data.username}</h1>
-          <p className="text-gray-400 mt-1">
-            Analyzed {data.games_analyzed} games from {formatDate(data.first_game_date)} to{" "}
-            {formatDate(data.last_game_date)}.
-          </p>
-        </header>
-
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Final Summary */}
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <ShieldCheck className="text-green-400" />
-                  <span>Final Summary</span>
-                </CardTitle>
-                <CardDescription>
-                  Consolidated view of the most important metrics and automated conclusion.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <MetricDisplay
-                  title="Overall Risk Score"
-                  value={data.risk.risk_score.toFixed(0)}
-                  tooltipText="A score from 0-100 indicating suspicion level."
-                  valueClassName="text-green-400"
-                />
-                <MetricDisplay
-                  title="Confidence Level"
-                  value={data.risk.confidence_level.toFixed(2)}
-                  unit="%"
-                  tooltipText="Our confidence in the accuracy of the risk score."
-                />
-                <MetricDisplay
-                  title="Suspicious Games"
-                  value={data.risk.suspicious_games_count}
-                  tooltipText="Number of games flagged with highly unusual patterns."
-                />
-              </CardContent>
-            </Card>
-
-            {/* Longitudinal Analysis (ROI) */}
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <LineChartIcon />
-                  <span>Longitudinal Analysis (ROI)</span>
-                </CardTitle>
-                <CardDescription>Return on Investment (Performance vs Expectation) over time.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px] w-full">
-                  <RoiChart data={roiChartData} />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column */}
-          <div className="space-y-6">
-            {/* Key Metrics */}
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Zap />
-                  <span>Key Metrics</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <MetricDisplay
-                  title="Avg. ACPL"
-                  value={data.avg_acpl.toFixed(2)}
-                  tooltipText="Average Centipawn Loss. Lower is better."
-                />
-                <MetricDisplay
-                  title="Avg. Match Rate"
-                  value={data.avg_match_rate.toFixed(2)}
-                  unit="%"
-                  tooltipText="How often the player's move matches the engine's top choice."
-                />
-                <MetricDisplay
-                  title="Opening Entropy"
-                  value={data.opening_patterns.mean_entropy.toFixed(2)}
-                  tooltipText="Diversity of openings played. Higher is more diverse."
-                />
-              </CardContent>
-            </Card>
-
-            {/* Tactical Analysis */}
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <BrainCircuit />
-                  <span>Tactical Analysis</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <MetricDisplay
-                  title="Precision Bursts"
-                  value={data.tactical.precision_burst_count}
-                  tooltipText="Number of times with a long streak of perfect moves."
-                />
-                <MetricDisplay
-                  title="2nd Choice Rate"
-                  value={data.tactical.second_choice_rate?.toFixed(2)}
-                  unit="%"
-                  tooltipText="Frequency of playing the engine's second-best move."
-                />
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <ResultsPageContent username={username} />
 }

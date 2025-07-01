@@ -1,357 +1,311 @@
 "use client"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Download, Share2, AlertTriangle, TrendingUp, BarChart3, Zap, User } from "lucide-react"
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts"
+  ArrowLeft,
+  Download,
+  Share2,
+  AlertTriangle,
+  TrendingUp,
+  BarChart3,
+  User,
+  ShieldCheck,
+  Gauge,
+  BrainCircuit,
+} from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
+import type { PlayerMetricsDetail } from "@/lib/types"
+import { MetricDisplay } from "./components/metric-display"
+import { Skeleton } from "@/components/ui/skeleton"
+
+// Helper to format numbers
+const formatNumber = (num: number, decimals = 2) => {
+  if (num === null || num === undefined) return "N/A"
+  return num.toFixed(decimals)
+}
+
+// Helper to get risk color
+const getRiskColor = (score: number) => {
+  if (score > 75) return "text-red-400"
+  if (score > 50) return "text-orange-400"
+  if (score > 25) return "text-yellow-400"
+  return "text-green-400"
+}
 
 export default function AnalysisResults() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const selectedUser = searchParams.get("user") || "magnus_carlsen"
+  const selectedUser = searchParams.get("user")
 
-  // Mock data for charts
-  const moveTimeData = [
-    { game: 1, avgTime: 15, suspicious: false },
-    { game: 2, avgTime: 12, suspicious: false },
-    { game: 3, avgTime: 3, suspicious: true },
-    { game: 4, avgTime: 18, suspicious: false },
-    { game: 5, avgTime: 3, suspicious: true },
-    { game: 6, avgTime: 14, suspicious: false },
-  ]
+  const [metrics, setMetrics] = useState<PlayerMetricsDetail | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const winLossData = [
-    { month: "Jan", wins: 45, losses: 23, draws: 12 },
-    { month: "Feb", wins: 52, losses: 18, draws: 15 },
-    { month: "Mar", wins: 38, losses: 31, draws: 18 },
-    { month: "Apr", wins: 41, losses: 25, draws: 14 },
-  ]
+  useEffect(() => {
+    if (!selectedUser) {
+      router.push("/")
+      return
+    }
 
-  const openingData = [
-    { name: "Sicilian Defense", value: 35, color: "#10b981" },
-    { name: "Queen's Gambit", value: 25, color: "#3b82f6" },
-    { name: "King's Indian", value: 20, color: "#8b5cf6" },
-    { name: "French Defense", value: 12, color: "#f59e0b" },
-    { name: "Others", value: 8, color: "#6b7280" },
-  ]
+    const fetchMetrics = async () => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const response = await fetch(`/api/metrics/player/${selectedUser}`)
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to fetch player metrics")
+        }
+        const data: PlayerMetricsDetail = await response.json()
+        setMetrics(data)
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-  const comebackGames = [
-    { id: 1, opponent: "player123", date: "2024-01-15", deficit: -5, outcome: "win" },
-    { id: 2, opponent: "chessmaster", date: "2024-01-12", deficit: -3, outcome: "win" },
-    { id: 3, opponent: "rookie_player", date: "2024-01-10", deficit: -4, outcome: "draw" },
-  ]
+    fetchMetrics()
+  }, [selectedUser, router])
+
+  if (isLoading) {
+    return <ResultsSkeleton />
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
+        <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Error al cargar los datos</h2>
+        <p className="text-gray-400 mb-6">{error}</p>
+        <Button onClick={() => router.push("/")}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Volver al inicio
+        </Button>
+      </div>
+    )
+  }
+
+  if (!metrics) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
+        <h2 className="text-2xl font-bold mb-2">No hay datos disponibles para este jugador</h2>
+        <Button onClick={() => router.push("/")}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Volver al inicio
+        </Button>
+      </div>
+    )
+  }
+
+  const riskScoreColor = getRiskColor(metrics.risk.risk_score)
 
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-black/50 backdrop-blur-sm">
+      <header className="border-b border-gray-800 bg-black/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Button variant="ghost" size="sm" onClick={() => router.push("/")}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Home
+                Volver
               </Button>
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
                   <User className="w-5 h-5" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold">{selectedUser}</h1>
-                  <p className="text-sm text-gray-400">Analysis completed</p>
+                  <h1 className="text-xl font-bold">{metrics.username}</h1>
+                  <p className="text-sm text-gray-400">
+                    Análisis completado el {new Date(metrics.analyzed_at).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
             </div>
             <div className="flex items-center space-x-2">
               <Button variant="outline" size="sm">
                 <Share2 className="w-4 h-4 mr-2" />
-                Share
+                Compartir
               </Button>
               <Button variant="outline" size="sm">
                 <Download className="w-4 h-4 mr-2" />
-                Export
+                Exportar
               </Button>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-6 py-8">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400">Games Analyzed</p>
-                  <p className="text-2xl font-bold">247</p>
-                </div>
-                <BarChart3 className="w-8 h-8 text-blue-400" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Puntuación de Riesgo</CardTitle>
+              <ShieldCheck className={`w-5 h-5 ${riskScoreColor}`} />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-4xl font-bold ${riskScoreColor}`}>
+                {formatNumber(metrics.risk.risk_score, 0)}/100
               </div>
+              <p className="text-xs text-gray-500">Evaluación general de sospecha</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Partidas Analizadas</CardTitle>
+              <BarChart3 className="w-5 h-5 text-blue-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">{metrics.games_analyzed}</div>
+              <p className="text-xs text-gray-500">
+                Del {new Date(metrics.first_game_date).toLocaleDateString()} al{" "}
+                {new Date(metrics.last_game_date).toLocaleDateString()}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Rendimiento Intrínseco</CardTitle>
+              <Gauge className="w-5 h-5 text-purple-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">{formatNumber(metrics.avg_ipr, 0)}</div>
+              <p className="text-xs text-gray-500">ELO estimado según sus jugadas</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Mejora Súbita</CardTitle>
+              <TrendingUp className="w-5 h-5 text-orange-400" />
+            </CardHeader>
+            <CardContent>
+              <div
+                className={`text-4xl font-bold ${metrics.step_function_detected ? "text-orange-400" : "text-green-400"}`}
+              >
+                {metrics.step_function_detected ? "Detectada" : "No"}
+              </div>
+              <p className="text-xs text-gray-500">Magnitud: {formatNumber(metrics.step_function_magnitude, 0)}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* First Block of Metrics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <BrainCircuit className="mr-2 text-blue-400" /> Métricas de Calidad
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Indicadores de la calidad y consistencia del juego.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <MetricDisplay
+                label="Pérdida Media de Centipeones (ACPL)"
+                value={formatNumber(metrics.avg_acpl)}
+                tooltipText="Valor promedio perdido por jugadas subóptimas. Un valor bajo es mejor. Un ACPL muy bajo para el rating del jugador puede ser sospechoso."
+              />
+              <MetricDisplay
+                label="Desviación Estándar de ACPL"
+                value={formatNumber(metrics.std_acpl)}
+                tooltipText="Mide la consistencia. Valores muy bajos pueden indicar una uniformidad poco natural."
+              />
+              <MetricDisplay
+                label="Coincidencia con el Módulo"
+                value={`${formatNumber(metrics.avg_match_rate * 100)}%`}
+                tooltipText="Porcentaje promedio de jugadas que coinciden con la primera opción del módulo de análisis."
+              />
+              <MetricDisplay
+                label="Desviación Estándar de Coincidencia"
+                value={`${formatNumber(metrics.std_match_rate * 100)}%`}
+                tooltipText="Consistencia de la tasa de coincidencia. Una variabilidad baja puede ser una señal de alerta."
+              />
+              <MetricDisplay
+                label="Rating de Rendimiento Intrínseco (IPR)"
+                value={formatNumber(metrics.avg_ipr, 0)}
+                tooltipText="Rating ELO estimado basado en la calidad de las jugadas, usando el modelo de Regan."
+              />
             </CardContent>
           </Card>
 
           <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400">Suspicious Patterns</p>
-                  <p className="text-2xl font-bold text-red-400">12</p>
-                </div>
-                <AlertTriangle className="w-8 h-8 text-red-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400">Win Rate</p>
-                  <p className="text-2xl font-bold text-green-400">68%</p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-green-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-400">Comebacks</p>
-                  <p className="text-2xl font-bold text-orange-400">23</p>
-                </div>
-                <Zap className="w-8 h-8 text-orange-400" />
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <ShieldCheck className="mr-2 text-red-400" /> Factores de Riesgo
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Factores específicos que contribuyen a la puntuación de riesgo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {Object.entries(metrics.risk.risk_factors).length > 0 ? (
+                Object.entries(metrics.risk.risk_factors).map(([factor, value]) => (
+                  <div key={factor} className="flex items-center justify-between">
+                    <p className="text-sm text-gray-300 capitalize">{factor.replace(/_/g, " ")}</p>
+                    <p className="text-sm font-semibold text-red-400">{formatNumber(value * 100, 0)}%</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-400 text-center py-4">
+                  No se detectaron factores de riesgo específicos.
+                </p>
+              )}
+              <div className="pt-4 border-t border-gray-700">
+                <MetricDisplay
+                  label="Nivel de Confianza"
+                  value={`${formatNumber(metrics.risk.confidence_level * 100, 0)}%`}
+                  tooltipText="El nivel de confianza de la evaluación de riesgo, basado en los datos disponibles."
+                />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Analysis Tabs */}
-        <Tabs defaultValue="entropy" className="space-y-6">
-          <TabsList className="bg-gray-800 border-gray-700">
-            <TabsTrigger value="entropy" className="data-[state=active]:bg-gray-700 text-white">
-              Opening Entropy
-            </TabsTrigger>
-            <TabsTrigger value="timing" className="data-[state=active]:bg-gray-700 text-white">
-              Move Timing
-            </TabsTrigger>
-            <TabsTrigger value="winloss" className="data-[state=active]:bg-gray-700 text-white">
-              Win/Loss Stats
-            </TabsTrigger>
-            <TabsTrigger value="comebacks" className="data-[state=active]:bg-gray-700 text-white">
-              Comebacks
-            </TabsTrigger>
-          </TabsList>
+        <div className="mt-8 text-center text-gray-500">
+          <p>Más secciones de análisis detallado próximamente...</p>
+        </div>
+      </main>
+    </div>
+  )
+}
 
-          <TabsContent value="entropy" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white">Opening Distribution</CardTitle>
-                  <CardDescription className="text-white">Frequency of different opening systems</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={openingData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={100}
-                        dataKey="value"
-                        label={({ name, value }) => `${name}: ${value}%`}
-                        labelStyle={{ fill: "#ffffff", fontSize: "12px" }}
-                      >
-                        {openingData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#000000",
-                          border: "1px solid #374151",
-                          borderRadius: "8px",
-                          color: "#ffffff",
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white">Entropy Analysis</CardTitle>
-                  <CardDescription className="text-white">Opening diversity vs ELO consistency</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-white">Opening Diversity</span>
-                      <span className="text-white">7.2/10</span>
-                    </div>
-                    <Progress value={72} className="h-2" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-white">ELO Consistency</span>
-                      <span className="text-white">8.5/10</span>
-                    </div>
-                    <Progress value={85} className="h-2" />
-                  </div>
-                  <div className="mt-4 p-4 bg-gray-700/50 rounded-lg">
-                    <p className="text-sm text-gray-300">
-                      <strong>Analysis:</strong> Good opening diversity with high ELO consistency. Pattern suggests
-                      natural learning progression rather than artificial assistance.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+function ResultsSkeleton() {
+  return (
+    <div className="min-h-screen bg-black text-white p-6">
+      <header className="border-b border-gray-800 bg-black/50 backdrop-blur-sm sticky top-0 z-10 mb-8">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Skeleton className="h-8 w-32 bg-gray-700" />
+            <div className="flex items-center space-x-3">
+              <Skeleton className="h-10 w-10 rounded-full bg-gray-700" />
+              <div>
+                <Skeleton className="h-6 w-40 mb-1 bg-gray-700" />
+                <Skeleton className="h-4 w-24 bg-gray-700" />
+              </div>
             </div>
-          </TabsContent>
-
-          <TabsContent value="timing" className="space-y-6">
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white">Move Timing Analysis</CardTitle>
-                <CardDescription className="text-white">Average time between moves across recent games</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <LineChart data={moveTimeData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
-                    <XAxis dataKey="game" stroke="#ffffff" />
-                    <YAxis stroke="#ffffff" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#000000",
-                        border: "1px solid #374151",
-                        borderRadius: "8px",
-                        color: "#ffffff",
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="avgTime"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                      dot={(props) => {
-                        const { cx, cy, payload } = props
-                        return (
-                          <circle
-                            cx={cx}
-                            cy={cy}
-                            r={4}
-                            fill={payload.suspicious ? "#ef4444" : "#10b981"}
-                            stroke={payload.suspicious ? "#ef4444" : "#10b981"}
-                            strokeWidth={2}
-                          />
-                        )
-                      }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-                <div className="mt-4 flex items-center space-x-4 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span className="text-white">Normal timing</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <span className="text-white">Suspicious timing</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="winloss" className="space-y-6">
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white">Win/Loss Statistics</CardTitle>
-                <CardDescription className="text-white">Game outcomes over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={winLossData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
-                    <XAxis dataKey="month" stroke="#ffffff" />
-                    <YAxis stroke="#ffffff" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#000000",
-                        border: "1px solid #374151",
-                        borderRadius: "8px",
-                        color: "#ffffff",
-                      }}
-                    />
-                    <Bar dataKey="wins" fill="#10b981" />
-                    <Bar dataKey="losses" fill="#ef4444" />
-                    <Bar dataKey="draws" fill="#6b7280" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="comebacks" className="space-y-6">
-            <Card className="bg-gray-800 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white">Comeback Games</CardTitle>
-                <CardDescription className="text-white">
-                  Games where player recovered from significant disadvantage
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {comebackGames.map((game) => (
-                    <div key={game.id} className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium">{game.opponent[0].toUpperCase()}</span>
-                        </div>
-                        <div>
-                          <p className="font-medium text-white">vs {game.opponent}</p>
-                          <p className="text-sm text-gray-400">{game.date}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <Badge variant="outline" className="border-red-500 text-red-400">
-                          {game.deficit} material
-                        </Badge>
-                        <Badge className={game.outcome === "win" ? "bg-green-600" : "bg-yellow-600"}>
-                          {game.outcome}
-                        </Badge>
-                        <Button variant="ghost" size="sm">
-                          View Game
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Skeleton className="h-8 w-24 bg-gray-700" />
+            <Skeleton className="h-8 w-24 bg-gray-700" />
+          </div>
+        </div>
+      </header>
+      <main className="container mx-auto px-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Skeleton className="h-32 rounded-lg bg-gray-800" />
+          <Skeleton className="h-32 rounded-lg bg-gray-800" />
+          <Skeleton className="h-32 rounded-lg bg-gray-800" />
+          <Skeleton className="h-32 rounded-lg bg-gray-800" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-64 rounded-lg bg-gray-800" />
+          <Skeleton className="h-64 rounded-lg bg-gray-800" />
+        </div>
+      </main>
     </div>
   )
 }

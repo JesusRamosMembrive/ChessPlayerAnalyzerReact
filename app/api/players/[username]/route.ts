@@ -2,9 +2,9 @@ import { type NextRequest, NextResponse } from "next/server"
 
 const API_URL = "https://31cc-87-221-57-241.ngrok-free.app"
 
-export async function DELETE(request: NextRequest, { params }: { params: { username: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ username: string }> }) {
   try {
-    const { username } = params
+    const { username } = await params
 
     if (!username) {
       return NextResponse.json({ error: "Username is required" }, { status: 400 })

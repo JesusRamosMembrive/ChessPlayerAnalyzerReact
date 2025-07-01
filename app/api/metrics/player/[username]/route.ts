@@ -25,7 +25,7 @@ export async function GET(request: Request, { params }: { params: { username: st
       // Add timeout using AbortController for better compatibility
       signal: (() => {
         const controller = new AbortController()
-        setTimeout(() => controller.abort(), 10000)
+        setTimeout(() => controller.abort(), 15000)
         return controller.signal
       })(),
     })

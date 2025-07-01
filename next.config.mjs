@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    optimizePackageImports: ['@tanstack/react-query'],
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -7,12 +10,9 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
+    domains: ['placeholder.svg'],
     unoptimized: true,
   },
-  experimental: {
-    optimizePackageImports: ['@tanstack/react-query'],
-  },
-  transpilePackages: ['@tanstack/react-query'],
 }
 
 export default nextConfig

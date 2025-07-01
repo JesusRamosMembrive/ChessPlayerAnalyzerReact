@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -27,20 +28,22 @@ interface PlayersListProps {
 }
 
 export function PlayersList({ onError }: PlayersListProps) {
-  const [players, setPlayers] = useState<PlayerListItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [retryCount, setRetryCount] = useState(0)
   const [loadingPlayer, setLoadingPlayer] = useState<string | null>(null)
   const [deletingPlayer, setDeletingPlayer] = useState<string | null>(null)
   const { toast } = useToast()
   const router = useRouter()
+  const queryClient = useQueryClient()
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const fetchPlayers = async (showToast = true) => {
-    try {
-      setLoading(true)
-      setError(null)
-
+  // Fetch players using React Query
+  const {
+    data: players = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["players"],
+    queryFn: async (): Promise<PlayerListItem[]> => {
       console.log("Fetching players from API...")
 
       const controller = new AbortController()
@@ -60,43 +63,36 @@ export function PlayersList({ onError }: PlayersListProps) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         console.error("API error response:", errorData)
-
         throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       const data = await response.json()
       console.log("Received data:", data)
 
-      // Handle empty array
       if (!Array.isArray(data)) {
         throw new Error("Invalid response format: expected array")
       }
 
-      if (data.length === 0) {
-        setPlayers([])
-        setError(null)
-        return
-      }
-
       // Validate and parse the data
       try {
-        const validatedPlayers = PlayerListItemSchema.array().parse(data)
-        setPlayers(validatedPlayers)
-        setError(null)
-
-        if (showToast && retryCount > 0) {
-          toast({
-            title: "Connection Restored",
-            description: "Successfully loaded players",
-          })
-        }
+        return PlayerListItemSchema.array().parse(data)
       } catch (validationError) {
         console.error("Data validation error:", validationError)
-        // Still show the data even if validation fails, but log the error
-        setPlayers(data)
-        setError(null)
+        // Still return the data even if validation fails
+        return data
       }
-    } catch (error: any) {
+    },
+    refetchInterval: (data) => {
+      // Auto-refetch every 5 seconds if there are pending players
+      const hasPendingPlayers = data?.some((player) => player.status === "pending")
+      return hasPendingPlayers ? 5000 : false
+    },
+    refetchIntervalInBackground: true,
+  })
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
       console.error("Failed to fetch players:", error)
 
       let errorMessage = "Failed to load players"
@@ -111,22 +107,15 @@ export function PlayersList({ onError }: PlayersListProps) {
         errorMessage = error.message || "Unknown error occurred"
       }
 
-      setError(errorMessage)
-      setPlayers([])
-
-      if (showToast) {
-        toast({
-          title: "Error Loading Players",
-          description: errorMessage,
-          variant: "destructive",
-        })
-      }
+      toast({
+        title: "Error Loading Players",
+        description: errorMessage,
+        variant: "destructive",
+      })
 
       onError?.(error)
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [error, toast, onError])
 
   const handlePlayerClick = async (username: string) => {
     if (loadingPlayer === username || deletingPlayer === username) return // Prevent clicks during operations
@@ -209,8 +198,11 @@ export function PlayersList({ onError }: PlayersListProps) {
         throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      // Remove player from local state
-      setPlayers((prevPlayers) => prevPlayers.filter((player) => player.username !== username))
+      // Update the query cache to remove the player
+      queryClient.setQueryData(["players"], (oldData: PlayerListItem[] | undefined) => {
+        if (!oldData) return []
+        return oldData.filter((player) => player.username !== username)
+      })
 
       toast({
         title: "Player Deleted",
@@ -242,13 +234,8 @@ export function PlayersList({ onError }: PlayersListProps) {
   }
 
   const handleRetry = () => {
-    setRetryCount((prev) => prev + 1)
-    fetchPlayers(true)
+    refetch()
   }
-
-  useEffect(() => {
-    fetchPlayers(false)
-  }, [])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -322,6 +309,11 @@ export function PlayersList({ onError }: PlayersListProps) {
           <div className="flex items-center space-x-2">
             <History className="w-5 h-5" />
             <span>Analyzed Players</span>
+            {players.some((p) => p.status === "pending") && (
+              <div className="animate-pulse">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+              </div>
+            )}
           </div>
           {error && (
             <Button
@@ -341,7 +333,7 @@ export function PlayersList({ onError }: PlayersListProps) {
           <div className="text-center py-8">
             <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-400" />
             <p className="text-lg font-medium mb-2 text-red-400">Connection Error</p>
-            <p className="text-sm text-gray-400 mb-4">{error}</p>
+            <p className="text-sm text-gray-400 mb-4">{error.message}</p>
             <div className="space-y-2 text-xs text-gray-500">
               <p>This usually means:</p>
               <ul className="list-disc list-inside space-y-1">
@@ -395,10 +387,12 @@ export function PlayersList({ onError }: PlayersListProps) {
                     </div>
 
                     {/* Progress bar for pending status */}
-                    {player.status === "pending" && player.progress !== undefined && (
+                    {player.status === "pending" && (
                       <div className="mb-2">
-                        <Progress value={player.progress} className="h-1" />
-                        <p className="text-xs text-gray-400 mt-1">{player.progress}% complete</p>
+                        <Progress value={player.progress || 0} className="h-1" />
+                        <p className="text-xs text-gray-400 mt-1">
+                          {player.progress !== undefined ? `${player.progress}% complete` : "Starting..."}
+                        </p>
                       </div>
                     )}
 
@@ -409,7 +403,7 @@ export function PlayersList({ onError }: PlayersListProps) {
                         </span>
                       )}
 
-                      {player.done_games && (
+                      {player.done_games !== undefined && (
                         <span className="flex items-center space-x-1">
                           <span>Done: {player.done_games}</span>
                         </span>

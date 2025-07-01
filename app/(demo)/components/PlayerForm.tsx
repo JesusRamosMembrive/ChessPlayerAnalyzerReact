@@ -3,63 +3,55 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/hooks/use-toast"
-import { analyzePlayer } from "@/lib/chess-api"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Loader2 } from "lucide-react"
 
-export function PlayerForm() {
+interface PlayerFormProps {
+  onSubmit: (username: string) => void
+}
+
+export function PlayerForm({ onSubmit }: PlayerFormProps) {
   const [username, setUsername] = useState("")
-  const { toast } = useToast()
-  const queryClient = useQueryClient()
+  const [isLoading, setIsLoading] = useState(false)
 
-  const analyzeMutation = useMutation({
-    mutationFn: analyzePlayer,
-    onSuccess: (data) => {
-      toast({
-        title: "Analysis Started",
-        description: `Analysis for ${username} has been queued (Task: ${data.task_id})`,
-      })
-      // Invalidate to trigger refetch
-      queryClient.invalidateQueries({ queryKey: ["player", username] })
-      setUsername("")
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Analysis Failed",
-        description: error.message || "Failed to start analysis",
-        variant: "destructive",
-      })
-    },
-  })
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!username.trim()) return
-    analyzeMutation.mutate(username.trim())
+
+    setIsLoading(true)
+    // Simulate API call delay
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    onSubmit(username.trim())
+    setUsername("")
+    setIsLoading(false)
   }
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="bg-gray-800 border-gray-700 max-w-md mx-auto">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center space-x-2 text-white">
           <Search className="w-5 h-5" />
-          Analyze Player
+          <span className="text-white">New Analysis</span>
         </CardTitle>
+        <CardDescription className="text-white">Enter a chess.com username to analyze</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             placeholder="Enter chess.com username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            disabled={analyzeMutation.isPending}
+            className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+            disabled={isLoading}
           />
-          <Button type="submit" className="w-full" disabled={!username.trim() || analyzeMutation.isPending}>
-            {analyzeMutation.isPending ? (
+          <Button
+            type="submit"
+            className="w-full bg-green-600 hover:bg-green-700"
+            disabled={!username.trim() || isLoading}
+          >
+            {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Starting Analysis...

@@ -1,110 +1,90 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { playerMetrics } from "@/lib/chess-api"
-import { usePlayer } from "@/hooks/usePlayer"
-import { BarChart3, TrendingUp, AlertTriangle, Zap } from "lucide-react"
+import { TrendingUp, Clock, Target, Zap } from "lucide-react"
 
 interface PlayerSummaryProps {
   username: string
 }
 
 export function PlayerSummary({ username }: PlayerSummaryProps) {
-  const { player } = usePlayer(username)
-
-  const { data: metrics, isLoading } = useQuery({
-    queryKey: ["playerMetrics", username],
-    queryFn: ({ signal }) => playerMetrics(username, signal),
-    enabled: player?.status === "completed",
-  })
-
-  if (player?.status !== "completed") {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center p-8 text-muted-foreground">
-          Analysis must be completed to view metrics
-        </CardContent>
-      </Card>
-    )
+  // Mock data based on username
+  const getMockData = (username: string) => {
+    const data = {
+      magnus_carlsen: {
+        totalGames: 1250,
+        openingEntropy: 8.7,
+        moveTimingConsistency: 94,
+        winLossRatio: 2.3,
+        comebackRate: 23,
+      },
+      hikaru_nakamura: {
+        totalGames: 980,
+        openingEntropy: 7.2,
+        moveTimingConsistency: 87,
+        winLossRatio: 1.9,
+        comebackRate: 31,
+      },
+      gotham_chess: {
+        totalGames: 650,
+        openingEntropy: 6.1,
+        moveTimingConsistency: 78,
+        winLossRatio: 1.4,
+        comebackRate: 18,
+      },
+    }
+    return data[username as keyof typeof data] || data.magnus_carlsen
   }
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center p-8">Loading metrics...</CardContent>
-      </Card>
-    )
-  }
-
-  if (!metrics) return null
-
-  const formatPercentage = (value: number) => `${(value * 100).toFixed(1)}%`
+  const playerData = getMockData(username)
 
   return (
-    <Card>
+    <Card className="bg-gray-800 border-gray-700">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="w-5 h-5" />
-          Player Summary - {username}
+        <CardTitle className="flex items-center justify-between text-white">
+          <span>Analysis Results: {username}</span>
+          <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500">
+            Complete
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{metrics.total_games}</div>
-            <div className="text-sm text-muted-foreground">Total Games</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="text-center p-4 bg-gray-700/50 rounded-lg">
+            <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <TrendingUp className="w-4 h-4 text-blue-400" />
+            </div>
+            <div className="text-2xl font-bold text-white">{playerData.openingEntropy}</div>
+            <div className="text-xs text-gray-400">Opening Entropy</div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{formatPercentage(metrics.win_rate)}</div>
-            <div className="text-sm text-muted-foreground">Win Rate</div>
+
+          <div className="text-center p-4 bg-gray-700/50 rounded-lg">
+            <div className="w-8 h-8 bg-purple-600/20 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <Clock className="w-4 h-4 text-purple-400" />
+            </div>
+            <div className="text-2xl font-bold text-white">{playerData.moveTimingConsistency}%</div>
+            <div className="text-xs text-gray-400">Move Timing</div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{metrics.comeback_games}</div>
-            <div className="text-sm text-muted-foreground">Comebacks</div>
+
+          <div className="text-center p-4 bg-gray-700/50 rounded-lg">
+            <div className="w-8 h-8 bg-green-600/20 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <Target className="w-4 h-4 text-green-400" />
+            </div>
+            <div className="text-2xl font-bold text-white">{playerData.winLossRatio}</div>
+            <div className="text-xs text-gray-400">Win/Loss Ratio</div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">{metrics.suspicious_patterns}</div>
-            <div className="text-sm text-muted-foreground">Suspicious</div>
+
+          <div className="text-center p-4 bg-gray-700/50 rounded-lg">
+            <div className="w-8 h-8 bg-orange-600/20 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <Zap className="w-4 h-4 text-orange-400" />
+            </div>
+            <div className="text-2xl font-bold text-white">{playerData.comebackRate}%</div>
+            <div className="text-xs text-gray-400">Comeback Rate</div>
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-purple-500" />
-              <span className="text-sm">Opening Diversity</span>
-            </div>
-            <Badge variant="outline">{formatPercentage(metrics.opening_diversity)}</Badge>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-blue-500" />
-              <span className="text-sm">Rating Consistency</span>
-            </div>
-            <Badge variant="outline">{formatPercentage(metrics.rating_consistency)}</Badge>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-yellow-500" />
-              <span className="text-sm">Avg Game Length</span>
-            </div>
-            <Badge variant="outline">{metrics.avg_game_length} moves</Badge>
-          </div>
-
-          {metrics.suspicious_patterns > 0 && (
-            <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-red-500" />
-                <span className="text-sm text-red-700">Suspicious Patterns Detected</span>
-              </div>
-              <Badge variant="destructive">{metrics.suspicious_patterns}</Badge>
-            </div>
-          )}
-        </div>
+        <div className="mt-4 text-center text-sm text-gray-400">Analysis based on {playerData.totalGames} games</div>
       </CardContent>
     </Card>
   )

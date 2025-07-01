@@ -9,6 +9,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  experimental: {
+    optimizePackageImports: ['@tanstack/react-query'],
+  },
+  transpilePackages: ['@tanstack/react-query'],
 }
 
 export default nextConfig

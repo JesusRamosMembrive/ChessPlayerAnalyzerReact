@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import dynamic from "next/dynamic"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
@@ -11,7 +12,26 @@ import { Search, TrendingUp, Clock, BarChart3, Zap, Loader2 } from "lucide-react
 import { useToast } from "@/hooks/use-toast"
 import { analyzePlayer } from "@/lib/chess-api"
 import { Toaster } from "@/components/ui/toaster"
-import { PlayersList } from "@/components/players-list"
+
+const PlayersList = dynamic(() => import("@/components/players-list").then(mod => ({ default: mod.PlayersList })), {
+  ssr: false,
+  loading: () => (
+    <Card className="bg-gray-800 border-gray-700">
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2 text-white">
+          <span>Loading Players...</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="animate-pulse space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-gray-700/50 rounded-lg"></div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+})
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +40,7 @@ const queryClient = new QueryClient({
         if (error?.status === 404) return false
         return failureCount < 3
       },
+      staleTime: 5 * 60 * 1000,
     },
   },
 })

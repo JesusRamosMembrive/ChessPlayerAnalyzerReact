@@ -12,6 +12,7 @@ import { History, User, Calendar, RefreshCw, AlertCircle } from "lucide-react"
 
 interface PlayersListProps {
   onError?: (error: any) => void
+  onPlayerClick?: (username: string) => void
 }
 
 export function PlayersList({ onError }: PlayersListProps) {

@@ -1,0 +1,47 @@
+# Chess Analyzer QML Port
+
+This directory contains the QML port of the Chess Player Analyzer React application.
+
+## Files
+
+- `main.qml` - Main application window and layout
+- `FeatureCard.qml` - Reusable component for feature cards
+- `qmldir` - QML module definition
+- `run.sh` - Script to run the QML application
+
+## Running the Application
+
+1. Install Qt with QML support:
+   ```bash
+   sudo apt-get install qml-module-qtquick2 qml-module-qtquick-controls2
+   ```
+
+2. Run the application:
+   ```bash
+   chmod +x run.sh
+   ./run.sh
+   ```
+
+   Or directly:
+   ```bash
+   qml main.qml
+   ```
+
+## Features Implemented
+
+- Dark theme matching the React version
+- Header with Chess Analyzer branding
+- Main analysis section with input field and button
+- 4-card features grid (Opening Entropy, Move Timing, Win/Loss Stats, Comeback Analysis)
+- Analyzed players section with loading skeleton
+- Responsive layout
+- Proper color scheme matching the original design
+
+## Visual Design
+
+The QML version recreates the exact visual design of the React application:
+- Black background (#000000)
+- Gray cards (#1f2937) with gray borders (#374151)
+- White text with gray secondary text (#9ca3af)
+- Green accent color (#16a34a) for buttons and branding
+- Proper spacing, padding, and rounded corners

@@ -1,29 +1,42 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { HelpCircle } from "lucide-react"
 
 interface MetricDisplayProps {
-  label: string
-  value: string | number
-  tooltipText: string
+  title: string
+  value: string | number | null | undefined
+  unit?: string
+  tooltipText?: string
+  className?: string
+  valueClassName?: string
 }
 
-export function MetricDisplay({ label, value, tooltipText }: MetricDisplayProps) {
+export function MetricDisplay({ title, value, unit, tooltipText, className, valueClassName }: MetricDisplayProps) {
+  const displayValue = value ?? "N/A"
+
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center space-x-2">
-        <p className="text-sm text-gray-300">{label}</p>
-        <TooltipProvider>
-          <Tooltip delayDuration={100}>
-            <TooltipTrigger asChild>
-              <HelpCircle className="w-4 h-4 text-gray-500 cursor-help" />
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs bg-gray-900 text-white border-gray-700">
-              <p>{tooltipText}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-      <p className="text-sm font-semibold text-white">{value}</p>
-    </div>
+    <Card className={`bg-gray-800/50 border-gray-700 ${className}`}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-gray-400">{title}</CardTitle>
+        {tooltipText && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <HelpCircle className="h-4 w-4 text-gray-500" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{tooltipText}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </CardHeader>
+      <CardContent>
+        <div className={`text-2xl font-bold text-white ${valueClassName}`}>
+          {displayValue}
+          {unit && value !== null && value !== undefined && <span className="text-sm font-normal">{unit}</span>}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

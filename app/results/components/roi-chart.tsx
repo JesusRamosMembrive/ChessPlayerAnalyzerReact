@@ -1,48 +1,44 @@
 "use client"
 
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
 interface RoiChartProps {
-  data: { month: number; roi: number }[]
+  data: { name: string; roi: number }[]
 }
 
-const formatNumber = (num: number, decimals = 0) => {
-  if (num === null || num === undefined) return "N/A"
-  return num.toFixed(decimals)
-}
-
-export function RoiChart({ data }: RoiChartProps) {
+export default function RoiChart({ data }: RoiChartProps) {
   if (!data || data.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full text-gray-500">
-        No hay datos de ROI disponibles para mostrar el gráfico.
-      </div>
-    )
+    return <div className="flex items-center justify-center h-full text-gray-500">No ROI data available.</div>
   }
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data}>
+      <AreaChart
+        data={data}
+        margin={{
+          top: 10,
+          right: 30,
+          left: 0,
+          bottom: 0,
+        }}
+      >
         <defs>
-          <linearGradient id="roiGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+          <linearGradient id="colorRoi" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
             <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
-        <XAxis dataKey="month" stroke="#ffffff" tickFormatter={(tick) => `Mes ${tick}`} />
-        <YAxis stroke="#ffffff" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+        <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+        <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
         <Tooltip
           contentStyle={{
-            backgroundColor: "#000000",
-            border: "1px solid #374151",
-            borderRadius: "8px",
+            backgroundColor: "#1f2937",
+            borderColor: "#374151",
             color: "#ffffff",
           }}
-          labelFormatter={(label) => `Mes ${label}`}
-          formatter={(value: number, name: string) => [`${formatNumber(value)}`, name === "roi" ? "ROI" : "Tendencia"]}
         />
-        <Area type="monotone" dataKey="roi" stroke="#10b981" strokeWidth={2} fill="url(#roiGradient)" />
+        <Area type="monotone" dataKey="roi" stroke="#10b981" fillOpacity={1} fill="url(#colorRoi)" />
       </AreaChart>
     </ResponsiveContainer>
   )

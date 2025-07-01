@@ -2,12 +2,14 @@ import { z } from "zod"
 
 // Schema for the list of players/analyses
 export const PlayerListItemSchema = z.object({
-  id: z.string(),
   username: z.string(),
-  status: z.enum(["pending", "in_progress", "completed", "failed"]),
-  created_at: z.string().datetime(),
-  finished_at: z.string().datetime().nullable().optional(), // Allow null or undefined
-  risk_score: z.number().nullable().optional(),
+  status: z.enum(["pending", "ready", "error"]), // Restored 'ready' to fix validation
+  progress: z.number(),
+  total_games: z.number().optional(),
+  done_games: z.number().optional(),
+  requested_at: z.string(), // Restored correct field name
+  finished_at: z.string().optional().nullable(), // Made validation less strict
+  error: z.string().optional().nullable(),
 })
 
 export type PlayerListItem = z.infer<typeof PlayerListItemSchema>
@@ -15,9 +17,9 @@ export type PlayerListItem = z.infer<typeof PlayerListItemSchema>
 // Schema for the detailed player metrics
 export const PlayerMetricsDetailSchema = z.object({
   username: z.string(),
-  analyzed_at: z.string().datetime(),
-  first_game_date: z.string().datetime(),
-  last_game_date: z.string().datetime(),
+  analyzed_at: z.string(),
+  first_game_date: z.string(),
+  last_game_date: z.string(),
   games_analyzed: z.number(),
   avg_acpl: z.number(),
   std_acpl: z.number(),

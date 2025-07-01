@@ -65,6 +65,73 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
+export async function POST(request: NextRequest, { params }: { params: Promise<{ username: string }> }) {
+  try {
+    const { username } = await params
+
+    if (!username) {
+      return NextResponse.json({ error: "Username is required" }, { status: 400 })
+    }
+
+    console.log(`Starting analysis for player: ${username}`)
+
+    const backendUrl = `${API_URL.replace(/\/$/, "")}/players/${username}`
+    console.log(`Full backend URL: ${backendUrl}`)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+    const response = await fetch(backendUrl, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+        "User-Agent": "NextJS-API-Route",
+      },
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    console.log(`Backend response status: ${response.status}`)
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "Unknown error")
+      console.error(`Backend error response: ${errorText}`)
+
+      if (response.status === 404) {
+        return NextResponse.json({ error: `Player '${username}' not found` }, { status: 404 })
+      }
+
+      return NextResponse.json(
+        {
+          error: `Backend error: ${response.status} ${response.statusText}`,
+          details: errorText,
+        },
+        { status: response.status },
+      )
+    }
+
+    const data = await response.json()
+    console.log(`Analysis started for ${username}:`, data)
+
+    return NextResponse.json(data)
+  } catch (error: any) {
+    console.error("Error starting analysis:", error)
+
+    if (error.name === "AbortError") {
+      return NextResponse.json({ error: "Request timeout - backend may be slow or unavailable" }, { status: 408 })
+    }
+
+    if (error.message?.includes("fetch")) {
+      return NextResponse.json({ error: "Unable to connect to backend server" }, { status: 503 })
+    }
+
+    return NextResponse.json({ error: "Internal server error", details: error.message }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ username: string }> }) {
   try {
     const { username } = await params

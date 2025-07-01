@@ -58,6 +58,11 @@ async function retryRequest<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay =
   throw lastError!
 }
 
+export interface AnalysisResponse {
+  task_id: string
+  message: string
+}
+
 export async function getPlayer(username: string, signal?: AbortSignal): Promise<any> {
   return retryRequest(() =>
     apiRequest(`/players/${username}`, {
@@ -66,11 +71,32 @@ export async function getPlayer(username: string, signal?: AbortSignal): Promise
   )
 }
 
-export async function analyzePlayer(username: string): Promise<{ task_id: string }> {
-  return apiRequest(`/players/${username}`, {
-    method: "POST",
-    schema: z.object({ task_id: z.string() }),
+export async function analyzePlayer(username: string): Promise<AnalysisResponse> {
+  console.log(`Starting analysis for player: ${username}`)
+  
+  const response = await fetch(`/api/players/${username}`, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
   })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error('Analysis API error:', errorData)
+    
+    throw new Error(
+      errorData.error || 
+      errorData.details || 
+      `HTTP ${response.status}: ${response.statusText}`
+    )
+  }
+
+  const data = await response.json()
+  console.log('Analysis response:', data)
+  
+  return data
 }
 
 export async function refreshPlayer(username: string): Promise<{ task_id: string }> {

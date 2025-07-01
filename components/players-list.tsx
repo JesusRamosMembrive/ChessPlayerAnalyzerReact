@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,7 +10,18 @@ import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { PlayerListItemSchema, type PlayerListItem } from "@/lib/types"
-import { History, User, Calendar, RefreshCw, AlertCircle } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { History, User, Calendar, RefreshCw, AlertCircle, Trash2 } from "lucide-react"
 
 interface PlayersListProps {
   onError?: (error: any) => void
@@ -21,6 +34,7 @@ export function PlayersList({ onError }: PlayersListProps) {
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const [loadingPlayer, setLoadingPlayer] = useState<string | null>(null)
+  const [deletingPlayer, setDeletingPlayer] = useState<string | null>(null)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -168,6 +182,65 @@ export function PlayersList({ onError }: PlayersListProps) {
       })
     } finally {
       setLoadingPlayer(null)
+    }
+  }
+
+  const handleDeletePlayer = async (username: string, event: React.MouseEvent) => {
+    event.stopPropagation() // Evitar que se active el click del jugador
+
+    if (deletingPlayer === username) return // Prevenir doble click
+
+    try {
+      setDeletingPlayer(username)
+      console.log(`Deleting player: ${username}`)
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+      const response = await fetch(`/api/players/${username}`, {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("Delete player API error:", errorData)
+        throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      // Actualizar la lista eliminando el jugador
+      setPlayers((prevPlayers) => prevPlayers.filter((player) => player.username !== username))
+
+      toast({
+        title: "Jugador eliminado",
+        description: `El jugador ${username} ha sido eliminado exitosamente`,
+      })
+    } catch (error: any) {
+      console.error(`Failed to delete player ${username}:`, error)
+
+      let errorMessage = "Error al eliminar jugador"
+
+      if (error.name === "AbortError" || error.name === "TimeoutError") {
+        errorMessage = "Tiempo de espera agotado - el servidor puede estar lento"
+      } else if (error.message?.includes("Failed to fetch")) {
+        errorMessage = "Error de red - no se pudo conectar a la API"
+      } else {
+        errorMessage = error.message || "Error desconocido"
+      }
+
+      toast({
+        title: "Error al eliminar jugador",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingPlayer(null)
     }
   }
 
@@ -342,18 +415,59 @@ export function PlayersList({ onError }: PlayersListProps) {
                   </div>
                 </div>
 
-                <div className="text-right text-xs text-gray-400 ml-4">
-                  {player.finished_at ? (
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="w-3 h-3" />
-                      <span>Finished: {formatDate(player.finished_at)}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="w-3 h-3" />
-                      <span>Started: {formatDate(player.requested_at || "")}</span>
-                    </div>
-                  )}
+                <div className="flex items-center space-x-2">
+                  <div className="text-right text-xs text-gray-400">
+                    {player.finished_at ? (
+                      <div className="flex items-center space-x-1">
+                        <Calendar className="w-3 h-3" />
+                        <span>Finished: {formatDate(player.finished_at)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1">
+                        <Calendar className="w-3 h-3" />
+                        <span>Started: {formatDate(player.requested_at || "")}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Botón de borrar con confirmación */}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                        disabled={deletingPlayer === player.username}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {deletingPlayer === player.username ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-gray-800 border-gray-700">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-white">¿Eliminar jugador?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-gray-400">
+                          Esta acción eliminará permanentemente el análisis de <strong>{player.username}</strong>. Esta
+                          acción no se puede deshacer.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
+                          Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={(e) => handleDeletePlayer(player.username, e)}
+                          className="bg-red-600 text-white hover:bg-red-700"
+                        >
+                          Eliminar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             ))}

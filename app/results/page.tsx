@@ -19,6 +19,7 @@ import {
   Clock,
   Target,
   Users,
+  Zap,
 } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import type { PlayerMetricsDetail } from "@/lib/types"
@@ -330,6 +331,20 @@ export default function AnalysisResults() {
                   <Line type="monotone" dataKey="roi" stroke="#10b981" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
+              <div className="mt-4 grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-sm text-gray-400">ROI Medio</p>
+                  <p className="text-lg font-semibold text-green-400">{formatNumber(metrics.roi_mean, 0)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">ROI Máximo</p>
+                  <p className="text-lg font-semibold text-blue-400">{formatNumber(metrics.roi_max, 0)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Desviación ROI</p>
+                  <p className="text-lg font-semibold text-purple-400">{formatNumber(metrics.roi_std, 0)}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
           <Card className="lg:col-span-2 bg-gray-800 border-gray-700">
@@ -572,6 +587,120 @@ export default function AnalysisResults() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Sixth Block - Tactical Analysis */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <Zap className="mr-2 text-amber-400" /> Análisis Táctico
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Patrones de precisión táctica y rachas de jugadas perfectas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <MetricDisplay
+                label="Rachas de Precisión"
+                value={metrics.tactical.precision_burst_count || "N/A"}
+                tooltipText="Número de rachas de jugadas casi perfectas (>95% de precisión). Muchas rachas pueden indicar uso de asistencia."
+              />
+              <MetricDisplay
+                label="Tasa de 2ª/3ª Opción Táctica"
+                value={
+                  metrics.tactical.second_choice_rate
+                    ? `${formatNumber(metrics.tactical.second_choice_rate * 100)}%`
+                    : "N/A"
+                }
+                tooltipText="Frecuencia de elección de líneas secundarias del módulo en posiciones tácticas. Los humanos tienden a elegir más líneas secundarias."
+              />
+              <div className="pt-4 border-t border-gray-700">
+                <MetricDisplay
+                  label="Puntuación de Selectividad"
+                  value={`${formatNumber(metrics.selectivity_score)}%`}
+                  tooltipText="Porcentaje de partidas donde la calidad está por encima de la mediana personal. Mide la consistencia del rendimiento."
+                />
+              </div>
+              <div className="pt-4 border-t border-gray-700">
+                <MetricDisplay
+                  label="Racha Más Larga (ROI > 2.75)"
+                  value={`${metrics.longest_streak} partidas`}
+                  tooltipText="Racha más larga de partidas consecutivas con ROI superior a 2.75 (umbral estadístico de rendimiento excepcional)."
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <Castle className="mr-2 text-violet-400" /> Análisis de Finales
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Eficiencia y precisión en la fase final de la partida.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <MetricDisplay
+                label="Eficiencia de Conversión"
+                value={`${metrics.endgame.conversion_efficiency}%`}
+                tooltipText="Porcentaje de finales ganadores que se convierten exitosamente en victoria. Una eficiencia muy alta puede ser sospechosa."
+              />
+              <MetricDisplay
+                label="Coincidencia con Tablebases"
+                value={metrics.endgame.tb_match_rate ? `${formatNumber(metrics.endgame.tb_match_rate * 100)}%` : "N/A"}
+                tooltipText="Porcentaje de coincidencia con las tablebases Syzygy en finales de pocas piezas. Una coincidencia perfecta es sospechosa."
+              />
+              <MetricDisplay
+                label="Desviación DTZ"
+                value={metrics.endgame.dtz_deviation ? formatNumber(metrics.endgame.dtz_deviation) : "N/A"}
+                tooltipText="Desviación promedio en Distance-to-Zero (jugadas para mate/tablas). Valores muy bajos indican juego perfecto."
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Summary Section */}
+        <Card className="bg-gradient-to-r from-gray-800 to-gray-900 border-gray-700">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center">
+              <ShieldCheck className="mr-2 text-blue-400" /> Resumen del Análisis
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              Evaluación integral basada en todas las métricas analizadas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center">
+                <div className={`text-3xl font-bold mb-2 ${riskScoreColor}`}>
+                  {formatNumber(metrics.risk.risk_score, 0)}/100
+                </div>
+                <p className="text-sm text-gray-400">Puntuación de Riesgo Final</p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold mb-2 text-blue-400">{metrics.games_analyzed}</div>
+                <p className="text-sm text-gray-400">Partidas Analizadas</p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold mb-2 text-purple-400">{metrics.risk.suspicious_games_count}</div>
+                <p className="text-sm text-gray-400">Partidas Sospechosas</p>
+              </div>
+            </div>
+            <div className="mt-6 p-4 bg-gray-700/30 rounded-lg">
+              <p className="text-sm text-gray-300 leading-relaxed">
+                <strong>Conclusión:</strong>{" "}
+                {metrics.risk.risk_score >= 75
+                  ? "El análisis indica un riesgo ALTO de uso de asistencia externa. Se recomienda una investigación más detallada."
+                  : metrics.risk.risk_score >= 50
+                    ? "El análisis indica un riesgo MODERADO. Algunos patrones requieren atención adicional."
+                    : metrics.risk.risk_score >= 25
+                      ? "El análisis indica un riesgo BAJO. Los patrones están dentro de rangos normales con algunas anomalías menores."
+                      : "El análisis indica un riesgo MUY BAJO. Los patrones de juego son consistentes con comportamiento humano natural."}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   )
@@ -619,6 +748,11 @@ function ResultsSkeleton() {
           <Skeleton className="h-56 rounded-lg bg-gray-800" />
         </div>
         <Skeleton className="h-96 rounded-lg bg-gray-800 mb-8" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Skeleton className="h-64 rounded-lg bg-gray-800" />
+          <Skeleton className="h-64 rounded-lg bg-gray-800" />
+        </div>
+        <Skeleton className="h-64 rounded-lg bg-gray-800" />
       </main>
     </div>
   )

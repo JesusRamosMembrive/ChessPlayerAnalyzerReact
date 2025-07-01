@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import type { PlayerListItem } from "@/lib/types"
 
 interface UseProgressPollingProps {
@@ -10,9 +10,11 @@ export function useProgressPolling({ players, setPlayers }: UseProgressPollingPr
   const [isPolling, setIsPolling] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const pendingPlayers = players.filter((player) => player.status === "pending")
+  const pendingPlayers = useMemo(() => {
+    return players.filter((player) => player.status === "pending")
+  }, [players])
 
-  const fetchPlayerProgress = async (username: string): Promise<PlayerListItem | null> => {
+  const fetchPlayerProgress = useCallback(async (username: string): Promise<PlayerListItem | null> => {
     try {
       const response = await fetch(`/api/players/${username}`, {
         headers: {
@@ -35,9 +37,9 @@ export function useProgressPolling({ players, setPlayers }: UseProgressPollingPr
       console.error(`Failed to fetch progress for ${username}:`, error)
       return null
     }
-  }
+  }, [])
 
-  const updatePlayersProgress = async () => {
+  const updatePlayersProgress = useCallback(async () => {
     if (pendingPlayers.length === 0) {
       return
     }
@@ -49,7 +51,8 @@ export function useProgressPolling({ players, setPlayers }: UseProgressPollingPr
     )
 
     setPlayers((currentPlayers) => {
-      return currentPlayers.map((player) => {
+      let hasUpdates = false;
+      const updatedPlayers = currentPlayers.map((player) => {
         if (player.status !== "pending") {
           return player
         }
@@ -63,27 +66,49 @@ export function useProgressPolling({ players, setPlayers }: UseProgressPollingPr
         const updateResult = updates[playerIndex]
         if (updateResult.status === "fulfilled" && updateResult.value) {
           const updatedData = updateResult.value
-          console.log(`Updated progress for ${player.username}:`, updatedData)
-          return {
+          console.log(`Player info received:`, updatedData)
+          console.log(`Previous progress: ${player.progress}, New progress: ${updatedData.progress}`)
+
+          // Always consider it an update to force re-render
+          hasUpdates = true;
+          console.log(`Progress update for ${player.username}: ${player.progress} -> ${updatedData.progress}`)
+
+          // Create a completely new object to ensure React detects the change
+          const updatedPlayer = {
             ...player,
             ...updatedData,
+            // Ensure progress is a number and not a string
+            progress: typeof updatedData.progress === 'string' 
+              ? parseFloat(updatedData.progress) 
+              : updatedData.progress
           }
+
+          // Log the final progress value to ensure it's correctly updated
+          console.log(`Final progress value: ${updatedPlayer.progress}`)
+
+          return updatedPlayer
         }
 
         return player
-      })
+      });
+
+      // Always return a new array reference to ensure React detects the change
+      // This is important for forcing a re-render even if only the progress property changed
+      return [...updatedPlayers];
     })
-  }
+  }, [pendingPlayers, setPlayers, fetchPlayerProgress])
 
   useEffect(() => {
-    if (pendingPlayers.length > 0) {
+    const hasPendingPlayers = pendingPlayers.length > 0;
+
+    if (hasPendingPlayers) {
       if (!isPolling) {
         console.log("Starting progress polling...")
         setIsPolling(true)
-        
+
         // Initial update
         updatePlayersProgress()
-        
+
         // Set up interval
         intervalRef.current = setInterval(updatePlayersProgress, 2000) // Poll every 2 seconds
       }
@@ -91,7 +116,7 @@ export function useProgressPolling({ players, setPlayers }: UseProgressPollingPr
       if (isPolling) {
         console.log("Stopping progress polling...")
         setIsPolling(false)
-        
+
         if (intervalRef.current) {
           clearInterval(intervalRef.current)
           intervalRef.current = null
@@ -105,7 +130,7 @@ export function useProgressPolling({ players, setPlayers }: UseProgressPollingPr
         intervalRef.current = null
       }
     }
-  }, [pendingPlayers.length, isPolling])
+  }, [pendingPlayers, isPolling, updatePlayersProgress])
 
   // Cleanup on unmount
   useEffect(() => {

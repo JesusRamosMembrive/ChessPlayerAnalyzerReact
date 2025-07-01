@@ -167,6 +167,17 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
   const handlePlayerClick = async (username: string) => {
     if (loadingPlayer === username) return // Prevent double clicks
 
+    // Check if player exists and if it's still being analyzed
+    const player = players.find(p => p.username === username)
+    if (player && player.status === "pending") {
+      toast({
+        title: "Player Still Analyzing",
+        description: `${username} is still being analyzed (${Math.round(player.progress || 0)}% complete). Please wait until analysis is complete.`,
+        variant: "default",
+      })
+      return
+    }
+
     try {
       setLoadingPlayer(username)
       console.log(`Fetching metrics for player: ${username}`)
@@ -188,6 +199,11 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
         const errorData = await response.json().catch(() => ({}))
         console.error("Player metrics API error:", errorData)
 
+        // Check if this is a 404 error (player not found)
+        if (response.status === 404) {
+          throw new Error(`Player '${username}' not found or not analyzed yet`)
+        }
+
         throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
       }
 
@@ -200,11 +216,15 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
       console.error(`Failed to fetch player metrics for ${username}:`, error)
 
       let errorMessage = "Failed to load player data"
+      let variant: "default" | "destructive" = "destructive"
 
       if (error.name === "AbortError" || error.name === "TimeoutError") {
         errorMessage = "Request timed out - player data may be loading"
       } else if (error.message?.includes("Failed to fetch")) {
         errorMessage = "Network error - unable to connect to API"
+      } else if (error.message?.includes("not found or not analyzed yet")) {
+        errorMessage = `${username} has not been fully analyzed yet. Please try again later.`
+        variant = "default" // Less alarming for this expected case
       } else {
         errorMessage = error.message || "Unknown error occurred"
       }
@@ -212,7 +232,7 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
       toast({
         title: "Error Loading Player",
         description: errorMessage,
-        variant: "destructive",
+        variant: variant,
       })
     } finally {
       setLoadingPlayer(null)
@@ -434,8 +454,12 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
                     {/* Progress bar for pending status */}
                     {player.status === "pending" && player.progress !== undefined && (
                       <div className="mb-2">
-                        <Progress value={player.progress} className="h-2" />
-                        <p className="text-xs text-gray-400 mt-1">{player.progress}% complete</p>
+                        <Progress 
+                          key={`progress-${player.username}-${player.progress}`} 
+                          value={player.progress} 
+                          className="h-2" 
+                        />
+                        <p className="text-xs text-gray-400 mt-1">{Math.round(player.progress)}% complete</p>
                       </div>
                     )}
 

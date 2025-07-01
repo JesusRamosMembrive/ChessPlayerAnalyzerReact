@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -25,25 +24,25 @@ import {
 interface PlayersListProps {
   onError?: (error: any) => void
   onPlayerClick?: (username: string) => void
+  onPlayerAdded?: (player: PlayerListItem) => void
 }
 
-export function PlayersList({ onError }: PlayersListProps) {
+export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
+  const [players, setPlayers] = useState<PlayerListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
   const [loadingPlayer, setLoadingPlayer] = useState<string | null>(null)
   const [deletingPlayer, setDeletingPlayer] = useState<string | null>(null)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
   const router = useRouter()
-  const queryClient = useQueryClient()
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Fetch players using React Query
-  const {
-    data: players = [],
-    isLoading: loading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ["players"],
-    queryFn: async (): Promise<PlayerListItem[]> => {
+  const fetchPlayers = async (showToast = true) => {
+    try {
+      setLoading(true)
+      setError(null)
+
       console.log("Fetching players from API...")
 
       const controller = new AbortController()
@@ -63,36 +62,43 @@ export function PlayersList({ onError }: PlayersListProps) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         console.error("API error response:", errorData)
+
         throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       const data = await response.json()
       console.log("Received data:", data)
 
+      // Handle empty array
       if (!Array.isArray(data)) {
         throw new Error("Invalid response format: expected array")
       }
 
+      if (data.length === 0) {
+        setPlayers([])
+        setError(null)
+        return
+      }
+
       // Validate and parse the data
       try {
-        return PlayerListItemSchema.array().parse(data)
+        const validatedPlayers = PlayerListItemSchema.array().parse(data)
+        setPlayers(validatedPlayers)
+        setError(null)
+
+        if (showToast && retryCount > 0) {
+          toast({
+            title: "Connection Restored",
+            description: "Successfully loaded players",
+          })
+        }
       } catch (validationError) {
         console.error("Data validation error:", validationError)
-        // Still return the data even if validation fails
-        return data
+        // Still show the data even if validation fails, but log the error
+        setPlayers(data)
+        setError(null)
       }
-    },
-    refetchInterval: (data) => {
-      // Auto-refetch every 5 seconds if there are pending players
-      const hasPendingPlayers = data?.some((player) => player.status === "pending")
-      return hasPendingPlayers ? 5000 : false
-    },
-    refetchIntervalInBackground: true,
-  })
-
-  // Handle errors
-  useEffect(() => {
-    if (error) {
+    } catch (error: any) {
       console.error("Failed to fetch players:", error)
 
       let errorMessage = "Failed to load players"
@@ -107,15 +113,22 @@ export function PlayersList({ onError }: PlayersListProps) {
         errorMessage = error.message || "Unknown error occurred"
       }
 
-      toast({
-        title: "Error Loading Players",
-        description: errorMessage,
-        variant: "destructive",
-      })
+      setError(errorMessage)
+      setPlayers([])
+
+      if (showToast) {
+        toast({
+          title: "Error Loading Players",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      }
 
       onError?.(error)
+    } finally {
+      setLoading(false)
     }
-  }, [error, toast, onError])
+  }
 
   const handlePlayerClick = async (username: string) => {
     if (loadingPlayer === username || deletingPlayer === username) return // Prevent clicks during operations
@@ -198,11 +211,8 @@ export function PlayersList({ onError }: PlayersListProps) {
         throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      // Update the query cache to remove the player
-      queryClient.setQueryData(["players"], (oldData: PlayerListItem[] | undefined) => {
-        if (!oldData) return []
-        return oldData.filter((player) => player.username !== username)
-      })
+      // Remove player from local state
+      setPlayers((prevPlayers) => prevPlayers.filter((player) => player.username !== username))
 
       toast({
         title: "Player Deleted",
@@ -234,8 +244,60 @@ export function PlayersList({ onError }: PlayersListProps) {
   }
 
   const handleRetry = () => {
-    refetch()
+    setRetryCount((prev) => prev + 1)
+    fetchPlayers(true)
   }
+
+  // Add a new player to the list (called from parent when analysis starts)
+  const addPlayer = (newPlayer: PlayerListItem) => {
+    setPlayers((prevPlayers) => {
+      // Check if player already exists
+      const existingIndex = prevPlayers.findIndex((p) => p.username === newPlayer.username)
+      if (existingIndex >= 0) {
+        // Update existing player
+        const updated = [...prevPlayers]
+        updated[existingIndex] = newPlayer
+        return updated
+      } else {
+        // Add new player at the beginning
+        return [newPlayer, ...prevPlayers]
+      }
+    })
+  }
+
+  // Setup auto-refresh for pending players
+  useEffect(() => {
+    const hasPendingPlayers = players.some((player) => player.status === "pending")
+
+    if (hasPendingPlayers && !autoRefreshInterval) {
+      console.log("Starting auto-refresh for pending players")
+      const interval = setInterval(() => {
+        fetchPlayers(false)
+      }, 5000)
+      setAutoRefreshInterval(interval)
+    } else if (!hasPendingPlayers && autoRefreshInterval) {
+      console.log("Stopping auto-refresh - no pending players")
+      clearInterval(autoRefreshInterval)
+      setAutoRefreshInterval(null)
+    }
+
+    return () => {
+      if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval)
+      }
+    }
+  }, [players, autoRefreshInterval])
+
+  // Expose addPlayer function to parent
+  useEffect(() => {
+    if (onPlayerAdded) {
+      onPlayerAdded(addPlayer as any)
+    }
+  }, [onPlayerAdded])
+
+  useEffect(() => {
+    fetchPlayers(false)
+  }, [])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -333,7 +395,7 @@ export function PlayersList({ onError }: PlayersListProps) {
           <div className="text-center py-8">
             <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-400" />
             <p className="text-lg font-medium mb-2 text-red-400">Connection Error</p>
-            <p className="text-sm text-gray-400 mb-4">{error.message}</p>
+            <p className="text-sm text-gray-400 mb-4">{error}</p>
             <div className="space-y-2 text-xs text-gray-500">
               <p>This usually means:</p>
               <ul className="list-disc list-inside space-y-1">

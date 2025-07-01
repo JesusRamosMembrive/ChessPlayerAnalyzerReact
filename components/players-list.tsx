@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -18,7 +19,9 @@ export function PlayersList({ onError }: PlayersListProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
+  const [loadingPlayer, setLoadingPlayer] = useState<string | null>(null)
   const { toast } = useToast()
+  const router = useRouter()
 
   const fetchPlayers = async (showToast = true) => {
     try {
@@ -27,15 +30,18 @@ export function PlayersList({ onError }: PlayersListProps) {
 
       console.log("Fetching players from API...")
 
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000)
+
       const response = await fetch("/api/players", {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        // Add timeout for client-side request
-        signal: AbortSignal.timeout(15000), // 15 second timeout
+        signal: controller.signal,
       })
 
+      clearTimeout(timeoutId)
       console.log("API response status:", response.status)
 
       if (!response.ok) {
@@ -81,7 +87,6 @@ export function PlayersList({ onError }: PlayersListProps) {
       console.error("Failed to fetch players:", error)
 
       let errorMessage = "Failed to load players"
-      const shouldShowRetry = true
 
       if (error.name === "AbortError" || error.name === "TimeoutError") {
         errorMessage = "Request timed out - backend may be slow or unavailable"
@@ -107,6 +112,61 @@ export function PlayersList({ onError }: PlayersListProps) {
       onError?.(error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePlayerClick = async (username: string) => {
+    if (loadingPlayer === username) return // Prevent double clicks
+
+    try {
+      setLoadingPlayer(username)
+      console.log(`Fetching metrics for player: ${username}`)
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+      const response = await fetch(`/api/metrics/player/${username}`, {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("Player metrics API error:", errorData)
+
+        throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const playerData = await response.json()
+      console.log("Player metrics received:", playerData)
+
+      // Navigate to results page with the username
+      router.push(`/results?user=${username}`)
+    } catch (error: any) {
+      console.error(`Failed to fetch player metrics for ${username}:`, error)
+
+      let errorMessage = "Failed to load player data"
+
+      if (error.name === "AbortError" || error.name === "TimeoutError") {
+        errorMessage = "Request timed out - player data may be loading"
+      } else if (error.message?.includes("Failed to fetch")) {
+        errorMessage = "Network error - unable to connect to API"
+      } else {
+        errorMessage = error.message || "Unknown error occurred"
+      }
+
+      toast({
+        title: "Error Loading Player",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingPlayer(null)
     }
   }
 
@@ -239,7 +299,10 @@ export function PlayersList({ onError }: PlayersListProps) {
             {players.map((player) => (
               <div
                 key={player.username}
-                className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg hover:bg-gray-700 transition-colors"
+                className={`flex items-center justify-between p-4 bg-gray-700/50 rounded-lg transition-colors cursor-pointer ${
+                  loadingPlayer === player.username ? "opacity-50 cursor-wait" : "hover:bg-gray-700"
+                }`}
+                onClick={() => handlePlayerClick(player.username)}
               >
                 <div className="flex items-center space-x-3 flex-1">
                   <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
@@ -249,6 +312,9 @@ export function PlayersList({ onError }: PlayersListProps) {
                     <div className="flex items-center space-x-2 mb-1">
                       <p className="font-medium text-white truncate">{player.username}</p>
                       {getStatusBadge(player.status)}
+                      {loadingPlayer === player.username && (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      )}
                     </div>
 
                     {/* Progress bar for pending status */}

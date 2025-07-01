@@ -52,8 +52,17 @@ export async function DELETE(request: NextRequest, { params }: { params: { usern
       )
     }
 
-    const data = await response.json()
-    console.log(`Player deletion response:`, data)
+    // Manejar respuesta exitosa - 204 No Content no tiene JSON
+    let data
+    if (response.status === 204) {
+      // 204 No Content - operación exitosa sin contenido
+      data = { message: `Player '${username}' deleted successfully` }
+      console.log(`Player '${username}' deleted successfully (204 No Content)`)
+    } else {
+      // Otras respuestas exitosas con contenido JSON
+      data = await response.json()
+      console.log(`Player deletion response:`, data)
+    }
 
     return NextResponse.json(data)
   } catch (error: any) {

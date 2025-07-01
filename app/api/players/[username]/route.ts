@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-const API_URL = "https://d68a-87-221-57-241.ngrok-free.app"
+const API_URL = "https://31cc-87-221-57-241.ngrok-free.app "
 
 export async function POST(request: Request, { params }: { params: { username: string } }) {
   try {

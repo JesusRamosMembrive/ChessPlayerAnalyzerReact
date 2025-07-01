@@ -2,16 +2,29 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, TrendingUp, Clock, BarChart3, Zap, Loader2 } from "lucide-react"
-import { PlayersList } from "@/components/players-list"
 import { useToast } from "@/hooks/use-toast"
 import { analyzePlayer } from "@/lib/chess-api"
+import { Toaster } from "@/components/ui/toaster"
+import { PlayersList } from "@/components/players-list"
 
-export default function ChessAnalyzerHome() {
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: any) => {
+        if (error?.status === 404) return false
+        return failureCount < 3
+      },
+    },
+  },
+})
+
+function ChessAnalyzerHomeContent() {
   const [username, setUsername] = useState("")
   const router = useRouter()
   const { toast } = useToast()
@@ -149,9 +162,18 @@ export default function ChessAnalyzerHome() {
           </div>
 
           {/* Analyzed Players List */}
-          <PlayersList onError={(error) => console.error("Failed to load players:", error)} />
+          <PlayersList onError={(error: any) => console.error("Failed to load players:", error)} />
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ChessAnalyzerHome() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ChessAnalyzerHomeContent />
+      <Toaster />
+    </QueryClientProvider>
   )
 }

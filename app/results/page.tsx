@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
+import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -26,7 +27,16 @@ import type { PlayerMetricsDetail } from "@/lib/types"
 import { MetricDisplay } from "./components/metric-display"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Progress } from "@/components/ui/progress"
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Area, AreaChart } from "recharts"
+import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
+
+const RoiChart = dynamic(() => import("./components/roi-chart").then((mod) => mod.RoiChart), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[300px]">
+      <Skeleton className="h-full w-full bg-gray-700" />
+    </div>
+  ),
+})
 
 // Helper to format numbers
 const formatNumber = (num: number, decimals = 2) => {
@@ -129,14 +139,11 @@ export default function AnalysisResults() {
 
   const riskScoreColor = getRiskColor(metrics.risk.risk_score)
 
-  // Prepare ROI chart data
   const roiChartData = metrics.performance.roi_curve.map((roi, index) => ({
     month: index + 1,
     roi: roi,
-    trend: metrics.performance.trend_acpl ? metrics.performance.trend_acpl * (index + 1) : 0,
   }))
 
-  // Prepare phase quality data
   const phaseQualityData = [
     { name: "Apertura", acpl: metrics.phase_quality.opening_acpl },
     { name: "Medio Juego", acpl: metrics.phase_quality.middlegame_acpl },
@@ -319,34 +326,7 @@ export default function AnalysisResults() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={roiChartData}>
-                  <defs>
-                    <linearGradient id="roiGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
-                  <XAxis dataKey="month" stroke="#ffffff" tickFormatter={(tick) => `Mes ${tick}`} />
-                  <YAxis stroke="#ffffff" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#000000",
-                      border: "1px solid #374151",
-                      borderRadius: "8px",
-                      color: "#ffffff",
-                    }}
-                    labelFormatter={(label) => `Mes ${label}`}
-                    formatter={(value, name) => [
-                      `${formatNumber(Number(value), 0)}`,
-                      name === "roi" ? "ROI" : "Tendencia",
-                    ]}
-                  />
-                  <Area type="monotone" dataKey="roi" stroke="#10b981" strokeWidth={2} fill="url(#roiGradient)" />
-                </AreaChart>
-              </ResponsiveContainer>
-
+              <RoiChart data={roiChartData} />
               {/* ROI Statistics */}
               <div className="mt-4 grid grid-cols-3 gap-4">
                 <div className="text-center p-3 bg-gray-700/30 rounded-lg">

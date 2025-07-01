@@ -13,11 +13,15 @@ import {
   ShieldCheck,
   Gauge,
   BrainCircuit,
+  BookOpen,
+  LineChartIcon,
+  Castle,
 } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import type { PlayerMetricsDetail } from "@/lib/types"
 import { MetricDisplay } from "./components/metric-display"
 import { Skeleton } from "@/components/ui/skeleton"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
 
 // Helper to format numbers
 const formatNumber = (num: number, decimals = 2) => {
@@ -100,6 +104,15 @@ export default function AnalysisResults() {
   }
 
   const riskScoreColor = getRiskColor(metrics.risk.risk_score)
+  const roiChartData = metrics.performance.roi_curve.map((roi, index) => ({
+    month: index + 1,
+    roi: roi,
+  }))
+  const phaseQualityData = [
+    { name: "Apertura", acpl: metrics.phase_quality.opening_acpl },
+    { name: "Medio Juego", acpl: metrics.phase_quality.middlegame_acpl },
+    { name: "Final", acpl: metrics.phase_quality.endgame_acpl },
+  ]
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -193,7 +206,7 @@ export default function AnalysisResults() {
         </div>
 
         {/* First Block of Metrics */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
               <CardTitle className="text-white flex items-center">
@@ -265,9 +278,122 @@ export default function AnalysisResults() {
           </Card>
         </div>
 
-        <div className="mt-8 text-center text-gray-500">
-          <p>Más secciones de análisis detallado próximamente...</p>
+        {/* Second Block of Metrics */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+          <Card className="lg:col-span-3 bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <LineChartIcon className="mr-2 text-green-400" /> Análisis Longitudinal (ROI)
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Evolución del rendimiento del jugador a lo largo del tiempo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={roiChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
+                  <XAxis dataKey="month" stroke="#ffffff" tickFormatter={(tick) => `Mes ${tick}`} />
+                  <YAxis stroke="#ffffff" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#000000",
+                      border: "1px solid #374151",
+                      borderRadius: "8px",
+                      color: "#ffffff",
+                    }}
+                    labelFormatter={(label) => `Mes ${label}`}
+                  />
+                  <Line type="monotone" dataKey="roi" stroke="#10b981" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+          <Card className="lg:col-span-2 bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <BookOpen className="mr-2 text-yellow-400" /> Patrones de Apertura
+              </CardTitle>
+              <CardDescription className="text-gray-400">Análisis del repertorio de aperturas.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <MetricDisplay
+                label="Diversidad de Aperturas (Entropía)"
+                value={formatNumber(metrics.opening_patterns.mean_entropy)}
+                tooltipText="Mide la diversidad del repertorio de aperturas usando la entropía de Shannon. Valores más altos indican mayor variedad."
+              />
+              <MetricDisplay
+                label="Profundidad de Novedad"
+                value={formatNumber(metrics.opening_patterns.novelty_depth)}
+                tooltipText="Profundidad promedio (en jugadas) donde el jugador se desvía de la teoría de aperturas conocida."
+              />
+              <MetricDisplay
+                label="Amplitud de Aperturas"
+                value={metrics.opening_patterns.opening_breadth}
+                tooltipText="Número de aperturas diferentes (identificadas por su código ECO) jugadas."
+              />
+              <MetricDisplay
+                label="Tasa de 2ª/3ª Opción"
+                value={`${formatNumber(metrics.opening_patterns.second_choice_rate * 100)}%`}
+                tooltipText="Frecuencia con la que el jugador elige jugadas que son la segunda o tercera mejor opción del módulo, lo cual puede ser un comportamiento humano natural."
+              />
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Third Block of Metrics */}
+        <Card className="bg-gray-800 border-gray-700">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center">
+              <Castle className="mr-2 text-indigo-400" /> Calidad por Fase de Juego
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              Análisis del rendimiento (ACPL) en cada fase de la partida.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={phaseQualityData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
+                  <XAxis dataKey="name" stroke="#ffffff" />
+                  <YAxis stroke="#ffffff" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#000000",
+                      border: "1px solid #374151",
+                      borderRadius: "8px",
+                      color: "#ffffff",
+                    }}
+                  />
+                  <Bar dataKey="acpl" name="ACPL" fill="#818cf8" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="space-y-4 flex flex-col justify-center">
+              <MetricDisplay
+                label="ACPL en Apertura"
+                value={formatNumber(metrics.phase_quality.opening_acpl)}
+                tooltipText="Pérdida media de centipeones durante la fase de apertura."
+              />
+              <MetricDisplay
+                label="ACPL en Medio Juego"
+                value={formatNumber(metrics.phase_quality.middlegame_acpl)}
+                tooltipText="Pérdida media de centipeones durante el medio juego."
+              />
+              <MetricDisplay
+                label="ACPL en Final"
+                value={formatNumber(metrics.phase_quality.endgame_acpl)}
+                tooltipText="Pérdida media de centipeones durante la fase final de la partida."
+              />
+              <MetricDisplay
+                label="Tasa de Errores Graves"
+                value={`${formatNumber(metrics.phase_quality.blunder_rate * 100)}%`}
+                tooltipText="Porcentaje de jugadas que son errores graves (pérdida de más de 300 centipeones)."
+              />
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   )
@@ -301,10 +427,15 @@ function ResultsSkeleton() {
           <Skeleton className="h-32 rounded-lg bg-gray-800" />
           <Skeleton className="h-32 rounded-lg bg-gray-800" />
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Skeleton className="h-64 rounded-lg bg-gray-800" />
           <Skeleton className="h-64 rounded-lg bg-gray-800" />
         </div>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+          <Skeleton className="h-80 lg:col-span-3 rounded-lg bg-gray-800" />
+          <Skeleton className="h-80 lg:col-span-2 rounded-lg bg-gray-800" />
+        </div>
+        <Skeleton className="h-80 rounded-lg bg-gray-800" />
       </main>
     </div>
   )

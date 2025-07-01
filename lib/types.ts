@@ -158,7 +158,7 @@ export const PlayerMetricsDetailSchema = z.object({
   peer_delta_acpl: z.number(),
   peer_delta_match: z.number(),
   selectivity_score: z.number(),
-  time_patterns: z.any().nullable(),
+  time_patterns: TimeManagementSchema.nullable(),
   opening_patterns: OpeningPatternsSchema,
   trend_acpl: z.number(),
   trend_match_rate: z.number(),

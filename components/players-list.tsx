@@ -136,7 +136,7 @@ export function PlayersList({
             data.map((player) => (
               <Link
                 key={player.username}
-                href={player.status === "completed" ? `/results?username=${player.username}` : "#"}
+                href={player.status === "completed" ? `/results?user=${player.username}` : "#"}
                 passHref
                 className={player.status === "completed" ? "block" : undefined}
                 style={{ pointerEvents: player.status === "completed" ? "auto" : "none" }}

@@ -1,8 +1,8 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 const API_URL = "https://d68a-87-221-57-241.ngrok-free.app"
 
-export async function GET(request: NextRequest, { params }: { params: { username: string } }) {
+export async function GET(request: Request, { params }: { params: { username: string } }) {
   try {
     const { username } = params
 
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: { username
       const errorText = await response.text().catch(() => "Unknown error")
       console.error(`Backend API error: ${response.status} ${response.statusText}`, errorText)
 
-      // Return 404 for metrics not found
+      // Return 404 for player not found
       if (response.status === 404) {
         return NextResponse.json({ error: "Player metrics not found" }, { status: 404 })
       }

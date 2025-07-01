@@ -8,7 +8,18 @@ import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { PlayerListItemSchema, type PlayerListItem } from "@/lib/types"
-import { History, User, Calendar, RefreshCw, AlertCircle } from "lucide-react"
+import { History, User, Calendar, RefreshCw, AlertCircle, Trash2 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface PlayersListProps {
   onError?: (error: any) => void
@@ -21,6 +32,7 @@ export function PlayersList({ onError }: PlayersListProps) {
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const [loadingPlayer, setLoadingPlayer] = useState<string | null>(null)
+  const [deletingPlayer, setDeletingPlayer] = useState<string | null>(null)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -117,7 +129,7 @@ export function PlayersList({ onError }: PlayersListProps) {
   }
 
   const handlePlayerClick = async (username: string) => {
-    if (loadingPlayer === username) return // Prevent double clicks
+    if (loadingPlayer === username || deletingPlayer === username) return // Prevent clicks during operations
 
     try {
       setLoadingPlayer(username)
@@ -168,6 +180,64 @@ export function PlayersList({ onError }: PlayersListProps) {
       })
     } finally {
       setLoadingPlayer(null)
+    }
+  }
+
+  const handleDeletePlayer = async (username: string) => {
+    try {
+      setDeletingPlayer(username)
+      console.log(`Deleting player: ${username}`)
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+      const response = await fetch(`/api/players/${username}`, {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("Delete player API error:", errorData)
+
+        throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      // Remove player from local state
+      setPlayers((prevPlayers) => prevPlayers.filter((player) => player.username !== username))
+
+      toast({
+        title: "Player Deleted",
+        description: `Successfully deleted ${username} and all associated data`,
+      })
+
+      console.log(`Player ${username} deleted successfully`)
+    } catch (error: any) {
+      console.error(`Failed to delete player ${username}:`, error)
+
+      let errorMessage = "Failed to delete player"
+
+      if (error.name === "AbortError" || error.name === "TimeoutError") {
+        errorMessage = "Request timed out - please try again"
+      } else if (error.message?.includes("Failed to fetch")) {
+        errorMessage = "Network error - unable to connect to API"
+      } else {
+        errorMessage = error.message || "Unknown error occurred"
+      }
+
+      toast({
+        title: "Error Deleting Player",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingPlayer(null)
     }
   }
 
@@ -300,12 +370,18 @@ export function PlayersList({ onError }: PlayersListProps) {
             {players.map((player) => (
               <div
                 key={player.username}
-                className={`flex items-center justify-between p-4 bg-gray-700/50 rounded-lg transition-colors cursor-pointer ${
-                  loadingPlayer === player.username ? "opacity-50 cursor-wait" : "hover:bg-gray-700"
+                className={`flex items-center justify-between p-4 bg-gray-700/50 rounded-lg transition-colors ${
+                  loadingPlayer === player.username || deletingPlayer === player.username ? "opacity-50" : ""
                 }`}
-                onClick={() => handlePlayerClick(player.username)}
               >
-                <div className="flex items-center space-x-3 flex-1">
+                <div
+                  className={`flex items-center space-x-3 flex-1 ${
+                    loadingPlayer === player.username || deletingPlayer === player.username
+                      ? "cursor-wait"
+                      : "cursor-pointer hover:bg-gray-700/30 rounded-lg p-2 -m-2"
+                  }`}
+                  onClick={() => handlePlayerClick(player.username)}
+                >
                   <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
                     <span className="text-sm font-medium text-white">{player.username[0].toUpperCase()}</span>
                   </div>
@@ -342,18 +418,59 @@ export function PlayersList({ onError }: PlayersListProps) {
                   </div>
                 </div>
 
-                <div className="text-right text-xs text-gray-400 ml-4">
-                  {player.finished_at ? (
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="w-3 h-3" />
-                      <span>Finished: {formatDate(player.finished_at)}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="w-3 h-3" />
-                      <span>Started: {formatDate(player.requested_at || "")}</span>
-                    </div>
-                  )}
+                <div className="flex items-center space-x-3">
+                  <div className="text-right text-xs text-gray-400">
+                    {player.finished_at ? (
+                      <div className="flex items-center space-x-1">
+                        <Calendar className="w-3 h-3" />
+                        <span>Finished: {formatDate(player.finished_at)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1">
+                        <Calendar className="w-3 h-3" />
+                        <span>Started: {formatDate(player.requested_at || "")}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Delete Button with Confirmation Dialog */}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={deletingPlayer === player.username || loadingPlayer === player.username}
+                        className="text-red-400 border-red-400/50 hover:bg-red-400/10 hover:border-red-400 bg-transparent"
+                      >
+                        {deletingPlayer === player.username ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-gray-800 border-gray-700">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-white">Delete Player Analysis</AlertDialogTitle>
+                        <AlertDialogDescription className="text-gray-400">
+                          Are you sure you want to delete the analysis for{" "}
+                          <span className="font-semibold text-white">{player.username}</span>? This action cannot be
+                          undone and will permanently remove all analysis data for this player.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeletePlayer(player.username)}
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             ))}

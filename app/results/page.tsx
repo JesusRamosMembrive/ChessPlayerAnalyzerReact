@@ -26,7 +26,7 @@ import type { PlayerMetricsDetail } from "@/lib/types"
 import { MetricDisplay } from "./components/metric-display"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Progress } from "@/components/ui/progress"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Area, AreaChart } from "recharts"
 
 // Helper to format numbers
 const formatNumber = (num: number, decimals = 2) => {
@@ -131,6 +131,7 @@ export default function AnalysisResults() {
   const roiChartData = metrics.performance.roi_curve.map((roi, index) => ({
     month: index + 1,
     roi: roi,
+    trend: metrics.performance.trend_acpl ? metrics.performance.trend_acpl * (index + 1) : 0,
   }))
   const phaseQualityData = [
     { name: "Apertura", acpl: metrics.phase_quality.opening_acpl },
@@ -302,9 +303,9 @@ export default function AnalysisResults() {
           </Card>
         </div>
 
-        {/* Second Block of Metrics */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
-          <Card className="lg:col-span-3 bg-gray-800 border-gray-700">
+        {/* Second Block of Metrics - Improved ROI Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <Card className="lg:col-span-2 bg-gray-800 border-gray-700">
             <CardHeader>
               <CardTitle className="text-white flex items-center">
                 <LineChartIcon className="mr-2 text-green-400" /> Análisis Longitudinal (ROI)
@@ -315,7 +316,13 @@ export default function AnalysisResults() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={roiChartData}>
+                <AreaChart data={roiChartData}>
+                  <defs>
+                    <linearGradient id="roiGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#4b5563" />
                   <XAxis dataKey="month" stroke="#ffffff" tickFormatter={(tick) => `Mes ${tick}`} />
                   <YAxis stroke="#ffffff" />
@@ -327,57 +334,153 @@ export default function AnalysisResults() {
                       color: "#ffffff",
                     }}
                     labelFormatter={(label) => `Mes ${label}`}
+                    formatter={(value, name) => [
+                      `${formatNumber(Number(value), 0)}`,
+                      name === "roi" ? "ROI" : "Tendencia",
+                    ]}
                   />
-                  <Line type="monotone" dataKey="roi" stroke="#10b981" strokeWidth={2} dot={false} />
-                </LineChart>
+                  <Area type="monotone" dataKey="roi" stroke="#10b981" strokeWidth={2} fill="url(#roiGradient)" />
+                </AreaChart>
               </ResponsiveContainer>
-              <div className="mt-4 grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <p className="text-sm text-gray-400">ROI Medio</p>
+
+              {/* ROI Statistics */}
+              <div className="mt-4 grid grid-cols-3 gap-4">
+                <div className="text-center p-3 bg-gray-700/30 rounded-lg">
+                  <p className="text-xs text-gray-400 mb-1">ROI Medio</p>
                   <p className="text-lg font-semibold text-green-400">{formatNumber(metrics.roi_mean, 0)}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-400">ROI Máximo</p>
+                <div className="text-center p-3 bg-gray-700/30 rounded-lg">
+                  <p className="text-xs text-gray-400 mb-1">ROI Máximo</p>
                   <p className="text-lg font-semibold text-blue-400">{formatNumber(metrics.roi_max, 0)}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-400">Desviación ROI</p>
+                <div className="text-center p-3 bg-gray-700/30 rounded-lg">
+                  <p className="text-xs text-gray-400 mb-1">Desviación ROI</p>
                   <p className="text-lg font-semibold text-purple-400">{formatNumber(metrics.roi_std, 0)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="lg:col-span-2 bg-gray-800 border-gray-700">
+
+          <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
               <CardTitle className="text-white flex items-center">
-                <BookOpen className="mr-2 text-yellow-400" /> Patrones de Apertura
+                <TrendingUp className="mr-2 text-orange-400" /> Tendencias
               </CardTitle>
-              <CardDescription className="text-gray-400">Análisis del repertorio de aperturas.</CardDescription>
+              <CardDescription className="text-gray-400">Análisis de tendencias temporales.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <MetricDisplay
-                label="Diversidad de Aperturas (Entropía)"
-                value={formatNumber(metrics.opening_patterns.mean_entropy)}
-                tooltipText="Mide la diversidad del repertorio de aperturas usando la entropía de Shannon. Valores más altos indican mayor variedad."
-              />
-              <MetricDisplay
-                label="Profundidad de Novedad"
-                value={formatNumber(metrics.opening_patterns.novelty_depth)}
-                tooltipText="Profundidad promedio (en jugadas) donde el jugador se desvía de la teoría de aperturas conocida."
-              />
-              <MetricDisplay
-                label="Amplitud de Aperturas"
-                value={metrics.opening_patterns.opening_breadth}
-                tooltipText="Número de aperturas diferentes (identificadas por su código ECO) jugadas."
-              />
-              <MetricDisplay
-                label="Tasa de 2ª/3ª Opción"
-                value={`${formatNumber(metrics.opening_patterns.second_choice_rate * 100)}%`}
-                tooltipText="Frecuencia con la que el jugador elige jugadas que son la segunda o tercera mejor opción del módulo, lo cual puede ser un comportamiento humano natural."
-              />
+            <CardContent className="space-y-6">
+              <div>
+                <MetricDisplay
+                  label="Tendencia ACPL"
+                  value={`${formatNumber(metrics.performance.trend_acpl)} cp/100 partidas`}
+                  tooltipText="Cambio en ACPL por cada 100 partidas. Valores negativos indican mejora."
+                />
+                <div className="mt-2">
+                  <Progress value={Math.min(Math.abs(metrics.performance.trend_acpl) / 10, 100)} className="h-2" />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {metrics.performance.trend_acpl < -50
+                      ? "Mejora significativa"
+                      : metrics.performance.trend_acpl < 0
+                        ? "Mejora gradual"
+                        : metrics.performance.trend_acpl < 50
+                          ? "Estable"
+                          : "Empeoramiento"}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <MetricDisplay
+                  label="Tendencia Match Rate"
+                  value={`${formatNumber(metrics.performance.trend_match_rate * 100)}%/100 partidas`}
+                  tooltipText="Cambio en tasa de coincidencia por cada 100 partidas."
+                />
+                <div className="mt-2">
+                  <Progress
+                    value={Math.min(Math.abs(metrics.performance.trend_match_rate) * 1000, 100)}
+                    className="h-2"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {metrics.performance.trend_match_rate > 0.05
+                      ? "Aumento significativo"
+                      : metrics.performance.trend_match_rate > 0
+                        ? "Aumento gradual"
+                        : metrics.performance.trend_match_rate > -0.05
+                          ? "Estable"
+                          : "Disminución"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-gray-700">
+                <div className="text-center">
+                  <p className="text-sm text-gray-400 mb-2">Evaluación de Tendencia</p>
+                  <div
+                    className={`text-2xl font-bold ${
+                      metrics.performance.trend_acpl < -100 && metrics.performance.trend_match_rate > 0.02
+                        ? "text-red-400"
+                        : metrics.performance.trend_acpl < -50
+                          ? "text-orange-400"
+                          : "text-green-400"
+                    }`}
+                  >
+                    {metrics.performance.trend_acpl < -100 && metrics.performance.trend_match_rate > 0.02
+                      ? "⚠️ Sospechoso"
+                      : metrics.performance.trend_acpl < -50
+                        ? "📈 Mejorando"
+                        : "✅ Normal"}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Patrones de Apertura - Now full width */}
+        <Card className="bg-gray-800 border-gray-700 mb-8">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center">
+              <BookOpen className="mr-2 text-yellow-400" /> Patrones de Apertura
+            </CardTitle>
+            <CardDescription className="text-gray-400">Análisis del repertorio de aperturas.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <MetricDisplay
+                  label="Diversidad de Aperturas (Entropía)"
+                  value={formatNumber(metrics.opening_patterns.mean_entropy)}
+                  tooltipText="Mide la diversidad del repertorio de aperturas usando la entropía de Shannon. Valores más altos indican mayor variedad."
+                />
+                <Progress value={Math.min(Math.abs(metrics.opening_patterns.mean_entropy) * 20, 100)} className="h-2" />
+              </div>
+              <div className="space-y-2">
+                <MetricDisplay
+                  label="Profundidad de Novedad"
+                  value={formatNumber(metrics.opening_patterns.novelty_depth)}
+                  tooltipText="Profundidad promedio (en jugadas) donde el jugador se desvía de la teoría de aperturas conocida."
+                />
+                <Progress value={Math.min(metrics.opening_patterns.novelty_depth * 10, 100)} className="h-2" />
+              </div>
+              <div className="space-y-2">
+                <MetricDisplay
+                  label="Amplitud de Aperturas"
+                  value={metrics.opening_patterns.opening_breadth}
+                  tooltipText="Número de aperturas diferentes (identificadas por su código ECO) jugadas."
+                />
+                <Progress value={Math.min(metrics.opening_patterns.opening_breadth * 5, 100)} className="h-2" />
+              </div>
+              <div className="space-y-2">
+                <MetricDisplay
+                  label="Tasa de 2ª/3ª Opción"
+                  value={`${formatNumber(metrics.opening_patterns.second_choice_rate * 100)}%`}
+                  tooltipText="Frecuencia con la que el jugador elige jugadas que son la segunda o tercera mejor opción del módulo, lo cual puede ser un comportamiento humano natural."
+                />
+                <Progress value={metrics.opening_patterns.second_choice_rate * 100} className="h-2" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Third Block of Metrics */}
         <Card className="bg-gray-800 border-gray-700 mb-8">
@@ -738,10 +841,11 @@ function ResultsSkeleton() {
           <Skeleton className="h-64 rounded-lg bg-gray-800" />
           <Skeleton className="h-64 rounded-lg bg-gray-800" />
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
-          <Skeleton className="h-80 lg:col-span-3 rounded-lg bg-gray-800" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <Skeleton className="h-80 lg:col-span-2 rounded-lg bg-gray-800" />
+          <Skeleton className="h-80 rounded-lg bg-gray-800" />
         </div>
+        <Skeleton className="h-80 rounded-lg bg-gray-800 mb-8" />
         <Skeleton className="h-80 rounded-lg bg-gray-800 mb-8" />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Skeleton className="h-56 rounded-lg bg-gray-800" />

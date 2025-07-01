@@ -10,19 +10,6 @@ import { useToast } from "@/hooks/use-toast"
 import { PlayersList } from "@/components/players-list"
 import type { PlayerListItem } from "@/lib/types"
 import { Search, TrendingUp, Users, BarChart3, Play } from "lucide-react"
-import { QueryClient } from "react-query"
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: (failureCount, error: any) => {
-        if (error?.status === 404) return false
-        return failureCount < 3
-      },
-      staleTime: 5 * 60 * 1000,
-    },
-  },
-})
 
 export default function HomePage() {
   const [username, setUsername] = useState("")

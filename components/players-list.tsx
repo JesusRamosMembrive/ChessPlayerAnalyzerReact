@@ -1,537 +1,164 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
-import { PlayerListItemSchema, type PlayerListItem } from "@/lib/types"
-import { History, User, Calendar, RefreshCw, AlertCircle, Trash2 } from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+import { List, AlertCircle, CheckCircle, Clock, ExternalLink } from "lucide-react"
+import type { PlayerListItem } from "@/lib/types"
+import { formatDistanceToNow } from "date-fns"
 
-interface PlayersListProps {
-  onError?: (error: any) => void
-  onPlayerClick?: (username: string) => void
-  onPlayerAdded?: (player: PlayerListItem) => void
+async function fetchPlayers(): Promise<PlayerListItem[]> {
+  const res = await fetch("/api/players")
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}))
+    console.error("Failed to fetch players:", errorData)
+    throw new Error("Failed to fetch players")
+  }
+  return res.json()
 }
 
-export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
-  const [players, setPlayers] = useState<PlayerListItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [retryCount, setRetryCount] = useState(0)
-  const [loadingPlayer, setLoadingPlayer] = useState<string | null>(null)
-  const [deletingPlayer, setDeletingPlayer] = useState<string | null>(null)
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<NodeJS.Timeout | null>(null)
-  const { toast } = useToast()
-  const router = useRouter()
+export function PlayersList({
+  onError,
+  onPlayerAdded,
+}: {
+  onError: (error: Error) => void
+  onPlayerAdded: (addPlayerFn: (player: PlayerListItem) => void) => void
+}) {
+  const queryClient = useQueryClient()
 
-  const fetchPlayers = async (showToast = true) => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      console.log("Fetching players from API...")
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 15000)
-
-      const response = await fetch("/api/players", {
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-      console.log("API response status:", response.status)
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error("API error response:", errorData)
-
-        throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
+  const { data, error, isLoading } = useQuery<PlayerListItem[]>({
+    queryKey: ["players"],
+    queryFn: fetchPlayers,
+    refetchInterval: (query) => {
+      const data = query.state.data
+      if (data?.some((p) => p.status === "pending" || p.status === "in_progress")) {
+        return 5000 // Poll every 5 seconds if there are active analyses
       }
+      return false // Otherwise, stop polling
+    },
+  })
 
-      const data = await response.json()
-      console.log("Received data:", data)
+  useEffect(() => {
+    if (error) {
+      onError(error as Error)
+    }
+  }, [error, onError])
 
-      // Handle empty array
-      if (!Array.isArray(data)) {
-        throw new Error("Invalid response format: expected array")
-      }
-
-      if (data.length === 0) {
-        setPlayers([])
-        setError(null)
-        return
-      }
-
-      // Validate and parse the data
-      try {
-        const validatedPlayers = PlayerListItemSchema.array().parse(data)
-        setPlayers(validatedPlayers)
-        setError(null)
-
-        if (showToast && retryCount > 0) {
-          toast({
-            title: "Connection Restored",
-            description: "Successfully loaded players",
-          })
+  useEffect(() => {
+    onPlayerAdded((player) => {
+      queryClient.setQueryData<PlayerListItem[]>(["players"], (oldData) => {
+        if (!oldData) return [player]
+        if (oldData.find((p) => p.username.toLowerCase() === player.username.toLowerCase())) {
+          return oldData.map((p) =>
+            p.username.toLowerCase() === player.username.toLowerCase() ? { ...p, status: "pending" } : p,
+          )
         }
-      } catch (validationError) {
-        console.error("Data validation error:", validationError)
-        // Still show the data even if validation fails, but log the error
-        setPlayers(data)
-        setError(null)
-      }
-    } catch (error: any) {
-      console.error("Failed to fetch players:", error)
-
-      let errorMessage = "Failed to load players"
-
-      if (error.name === "AbortError" || error.name === "TimeoutError") {
-        errorMessage = "Request timed out - backend may be slow or unavailable"
-      } else if (error.message?.includes("Failed to fetch")) {
-        errorMessage = "Network error - unable to connect to API"
-      } else if (error.message?.includes("backend")) {
-        errorMessage = error.message
-      } else {
-        errorMessage = error.message || "Unknown error occurred"
-      }
-
-      setError(errorMessage)
-      setPlayers([])
-
-      if (showToast) {
-        toast({
-          title: "Error Loading Players",
-          description: errorMessage,
-          variant: "destructive",
-        })
-      }
-
-      onError?.(error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handlePlayerClick = async (username: string) => {
-    if (loadingPlayer === username || deletingPlayer === username) return // Prevent clicks during operations
-
-    try {
-      setLoadingPlayer(username)
-      console.log(`Fetching metrics for player: ${username}`)
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000)
-
-      const response = await fetch(`/api/metrics/player/${username}`, {
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: controller.signal,
+        return [player, ...oldData]
       })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error("Player metrics API error:", errorData)
-
-        throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const playerData = await response.json()
-      console.log("Player metrics received:", playerData)
-
-      // Navigate to results page with the username
-      router.push(`/results?user=${username}`)
-    } catch (error: any) {
-      console.error(`Failed to fetch player metrics for ${username}:`, error)
-
-      let errorMessage = "Failed to load player data"
-
-      if (error.name === "AbortError" || error.name === "TimeoutError") {
-        errorMessage = "Request timed out - player data may be loading"
-      } else if (error.message?.includes("Failed to fetch")) {
-        errorMessage = "Network error - unable to connect to API"
-      } else {
-        errorMessage = error.message || "Unknown error occurred"
-      }
-
-      toast({
-        title: "Error Loading Player",
-        description: errorMessage,
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingPlayer(null)
-    }
-  }
-
-  const handleDeletePlayer = async (username: string) => {
-    try {
-      setDeletingPlayer(username)
-      console.log(`Deleting player: ${username}`)
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000)
-
-      const response = await fetch(`/api/players/${username}`, {
-        method: "DELETE",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error("Delete player API error:", errorData)
-
-        throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      // Remove player from local state
-      setPlayers((prevPlayers) => prevPlayers.filter((player) => player.username !== username))
-
-      toast({
-        title: "Player Deleted",
-        description: `Successfully deleted ${username} and all associated data`,
-      })
-
-      console.log(`Player ${username} deleted successfully`)
-    } catch (error: any) {
-      console.error(`Failed to delete player ${username}:`, error)
-
-      let errorMessage = "Failed to delete player"
-
-      if (error.name === "AbortError" || error.name === "TimeoutError") {
-        errorMessage = "Request timed out - please try again"
-      } else if (error.message?.includes("Failed to fetch")) {
-        errorMessage = "Network error - unable to connect to API"
-      } else {
-        errorMessage = error.message || "Unknown error occurred"
-      }
-
-      toast({
-        title: "Error Deleting Player",
-        description: errorMessage,
-        variant: "destructive",
-      })
-    } finally {
-      setDeletingPlayer(null)
-    }
-  }
-
-  const handleRetry = () => {
-    setRetryCount((prev) => prev + 1)
-    fetchPlayers(true)
-  }
-
-  // Add a new player to the list (called from parent when analysis starts)
-  const addPlayer = (newPlayer: PlayerListItem) => {
-    setPlayers((prevPlayers) => {
-      // Check if player already exists
-      const existingIndex = prevPlayers.findIndex((p) => p.username === newPlayer.username)
-      if (existingIndex >= 0) {
-        // Update existing player
-        const updated = [...prevPlayers]
-        updated[existingIndex] = newPlayer
-        return updated
-      } else {
-        // Add new player at the beginning
-        return [newPlayer, ...prevPlayers]
-      }
     })
-  }
+  }, [onPlayerAdded, queryClient])
 
-  // Setup auto-refresh for pending players
-  useEffect(() => {
-    const hasPendingPlayers = players.some((player) => player.status === "pending")
-
-    if (hasPendingPlayers && !autoRefreshInterval) {
-      console.log("Starting auto-refresh for pending players")
-      const interval = setInterval(() => {
-        fetchPlayers(false)
-      }, 5000)
-      setAutoRefreshInterval(interval)
-    } else if (!hasPendingPlayers && autoRefreshInterval) {
-      console.log("Stopping auto-refresh - no pending players")
-      clearInterval(autoRefreshInterval)
-      setAutoRefreshInterval(null)
-    }
-
-    return () => {
-      if (autoRefreshInterval) {
-        clearInterval(autoRefreshInterval)
-      }
-    }
-  }, [players, autoRefreshInterval])
-
-  // Expose addPlayer function to parent
-  useEffect(() => {
-    if (onPlayerAdded) {
-      onPlayerAdded(addPlayer as any)
-    }
-  }, [onPlayerAdded])
-
-  useEffect(() => {
-    fetchPlayers(false)
-  }, [])
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const renderPlayerStatus = (player: PlayerListItem) => {
+    switch (player.status) {
       case "pending":
         return (
-          <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500">
-            Pending
+          <Badge variant="secondary" className="flex items-center space-x-1">
+            <Clock className="w-3 h-3" />
+            <span>Pending</span>
           </Badge>
         )
-      case "ready":
+      case "in_progress":
         return (
-          <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500">
-            Ready
+          <Badge variant="outline" className="flex items-center space-x-1 border-blue-500 text-blue-500">
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
+            <span>In Progress</span>
           </Badge>
         )
-      case "error":
+      case "completed":
         return (
-          <Badge variant="outline" className="bg-red-500/20 text-red-400 border-red-500">
-            Error
+          <Badge variant="outline" className="flex items-center space-x-1 border-green-500 text-green-500">
+            <CheckCircle className="w-3 h-3" />
+            <span>Completed</span>
+          </Badge>
+        )
+      case "failed":
+        return (
+          <Badge variant="destructive" className="flex items-center space-x-1">
+            <AlertCircle className="w-3 h-3" />
+            <span>Failed</span>
           </Badge>
         )
       default:
-        return <Badge variant="outline">{status}</Badge>
+        return <Badge variant="secondary">{player.status}</Badge>
     }
-  }
-
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleDateString()
-    } catch {
-      return dateString
-    }
-  }
-
-  if (loading) {
-    return (
-      <Card className="bg-gray-800 border-gray-700">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-white">
-            <History className="w-5 h-5" />
-            <span>Analyzed Players</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* Skeleton loader */}
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gray-600 rounded-full"></div>
-                    <div className="space-y-2">
-                      <div className="h-4 bg-gray-600 rounded w-24"></div>
-                      <div className="h-3 bg-gray-600 rounded w-16"></div>
-                    </div>
-                  </div>
-                  <div className="h-6 bg-gray-600 rounded w-16"></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    )
   }
 
   return (
     <Card className="bg-gray-800 border-gray-700">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between text-white">
-          <div className="flex items-center space-x-2">
-            <History className="w-5 h-5" />
-            <span>Analyzed Players</span>
-            {players.some((p) => p.status === "pending") && (
-              <div className="animate-pulse">
-                <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-              </div>
-            )}
-          </div>
-          {error && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRetry}
-              className="text-white border-gray-600 hover:bg-gray-700 bg-transparent"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Retry
-            </Button>
-          )}
+        <CardTitle className="flex items-center space-x-2 text-white">
+          <List className="w-5 h-5" />
+          <span>Recent Analyses</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {error ? (
-          <div className="text-center py-8">
-            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-400" />
-            <p className="text-lg font-medium mb-2 text-red-400">Connection Error</p>
-            <p className="text-sm text-gray-400 mb-4">{error}</p>
-            <div className="space-y-2 text-xs text-gray-500">
-              <p>This usually means:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>The backend server is not running</li>
-                <li>The server URL has changed</li>
-                <li>Network connectivity issues</li>
-              </ul>
-            </div>
-            <Button
-              variant="outline"
-              onClick={handleRetry}
-              className="mt-4 text-white border-gray-600 hover:bg-gray-700 bg-transparent"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Try Again
-            </Button>
-          </div>
-        ) : players.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
-            <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium mb-2">No players analyzed</p>
-            <p className="text-sm">Start analyzing a player to see results here</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {players.map((player) => (
-              <div
-                key={player.username}
-                className={`flex items-center justify-between p-4 bg-gray-700/50 rounded-lg transition-colors ${
-                  loadingPlayer === player.username || deletingPlayer === player.username ? "opacity-50" : ""
-                }`}
-              >
-                <div
-                  className={`flex items-center space-x-3 flex-1 ${
-                    loadingPlayer === player.username || deletingPlayer === player.username
-                      ? "cursor-wait"
-                      : "cursor-pointer hover:bg-gray-700/30 rounded-lg p-2 -m-2"
-                  }`}
-                  onClick={() => handlePlayerClick(player.username)}
-                >
-                  <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-white">{player.username[0].toUpperCase()}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <p className="font-medium text-white truncate">{player.username}</p>
-                      {getStatusBadge(player.status)}
-                      {loadingPlayer === player.username && (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      )}
-                    </div>
-
-                    {/* Progress bar for pending status */}
-                    {player.status === "pending" && (
-                      <div className="mb-2">
-                        <Progress value={player.progress || 0} className="h-1" />
-                        <p className="text-xs text-gray-400 mt-1">
-                          {player.progress !== undefined ? `${player.progress}% complete` : "Starting..."}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex items-center space-x-4 text-xs text-gray-400">
-                      {player.total_games && (
-                        <span className="flex items-center space-x-1">
-                          <span>Games: {player.total_games}</span>
-                        </span>
-                      )}
-
-                      {player.done_games !== undefined && (
-                        <span className="flex items-center space-x-1">
-                          <span>Done: {player.done_games}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
+        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+          {isLoading &&
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="p-3 bg-gray-700/50 rounded-lg space-y-2">
+                <div className="flex justify-between items-center">
+                  <Skeleton className="h-5 w-24" />
+                  <Skeleton className="h-5 w-20" />
                 </div>
-
-                <div className="flex items-center space-x-3">
-                  <div className="text-right text-xs text-gray-400">
-                    {player.finished_at ? (
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>Finished: {formatDate(player.finished_at)}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>Started: {formatDate(player.requested_at || "")}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Delete Button with Confirmation Dialog */}
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={deletingPlayer === player.username || loadingPlayer === player.username}
-                        className="text-red-400 border-red-400/50 hover:bg-red-400/10 hover:border-red-400 bg-transparent"
-                      >
-                        {deletingPlayer === player.username ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-gray-800 border-gray-700">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-white">Delete Player Analysis</AlertDialogTitle>
-                        <AlertDialogDescription className="text-gray-400">
-                          Are you sure you want to delete the analysis for{" "}
-                          <span className="font-semibold text-white">{player.username}</span>? This action cannot be
-                          undone and will permanently remove all analysis data for this player.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDeletePlayer(player.username)}
-                          className="bg-red-600 hover:bg-red-700 text-white"
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                <Skeleton className="h-2 w-full" />
+                <div className="flex justify-between items-center">
+                  <Skeleton className="h-4 w-32" />
                 </div>
               </div>
             ))}
-          </div>
-        )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>Could not load player list. Please try again later.</AlertDescription>
+            </Alert>
+          )}
+          {data && data.length === 0 && !isLoading && (
+            <p className="text-gray-400 text-center py-4">No analyses yet. Enter a username to start.</p>
+          )}
+          {data &&
+            data.map((player) => (
+              <div key={player.username} className="p-3 bg-gray-700/50 rounded-lg">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-bold text-white">{player.username}</span>
+                  {renderPlayerStatus(player)}
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Progress value={player.progress || 0} className="w-full [&>div]:bg-blue-500" />
+                  <span className="text-sm text-gray-300 w-24 text-right">
+                    {player.done_games}/{player.total_games || "?"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
+                  <span>Requested {formatDistanceToNow(new Date(player.requested_at), { addSuffix: true })}</span>
+                  {player.status === "completed" && (
+                    <Link href={`/results?username=${player.username}`} passHref>
+                      <Button variant="link" className="h-auto p-0 text-blue-400 hover:text-blue-300">
+                        View Results
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ))}
+        </div>
       </CardContent>
     </Card>
   )

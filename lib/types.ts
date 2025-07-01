@@ -2,11 +2,11 @@ import { z } from "zod"
 
 export const PlayerListItemSchema = z.object({
   username: z.string(),
-  status: z.enum(["pending", "ready", "error"]),
-  progress: z.number().min(0).max(100).optional(),
+  status: z.enum(["pending", "ready", "error", "in_progress", "completed", "failed"]),
+  progress: z.number().min(0).max(100),
   requested_at: z.string(),
   total_games: z.number().optional(),
-  done_games: z.number().optional(),
+  done_games: z.number(),
   finished_at: z.string().optional(),
 })
 

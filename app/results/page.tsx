@@ -16,6 +16,8 @@ import {
   BookOpen,
   LineChartIcon,
   Castle,
+  Clock,
+  Target,
 } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import type { PlayerMetricsDetail } from "@/lib/types"
@@ -342,7 +344,7 @@ export default function AnalysisResults() {
         </div>
 
         {/* Third Block of Metrics */}
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-gray-800 border-gray-700 mb-8">
           <CardHeader>
             <CardTitle className="text-white flex items-center">
               <Castle className="mr-2 text-indigo-400" /> Calidad por Fase de Juego
@@ -394,6 +396,63 @@ export default function AnalysisResults() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Fourth Block of Metrics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <Clock className="mr-2 text-cyan-400" /> Gestión del Tiempo
+              </CardTitle>
+              <CardDescription className="text-gray-400">Análisis de los patrones de uso del tiempo.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <MetricDisplay
+                label="Tiempo Medio por Jugada"
+                value={`${formatNumber(metrics.time_management.mean_move_time)}s`}
+                tooltipText="Tiempo promedio en segundos que el jugador tarda en realizar una jugada."
+              />
+              <MetricDisplay
+                label="Varianza del Tiempo"
+                value={formatNumber(metrics.time_management.time_variance)}
+                tooltipText="Mide la variabilidad en el tiempo de reflexión. Una varianza baja puede ser sospechosa."
+              />
+              <MetricDisplay
+                label="Puntuación de Uniformidad"
+                value={formatNumber(metrics.time_management.uniformity_score)}
+                tooltipText="Un score que mide qué tan uniforme es el tiempo de respuesta. Valores negativos son más naturales, valores positivos altos son sospechosos."
+              />
+              <MetricDisplay
+                label="Picos de Lag"
+                value={metrics.time_management.lag_spike_count}
+                tooltipText="Número de veces que el jugador tarda mucho en una jugada y luego realiza la siguiente muy rápido, un posible patrón de consulta a un módulo."
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <Target className="mr-2 text-rose-400" /> Precisión Bajo Presión (Clutch)
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Rendimiento en momentos críticos de la partida.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <MetricDisplay
+                label="Diferencia Media en 'Clutch'"
+                value={formatNumber(metrics.clutch_accuracy.avg_clutch_diff)}
+                tooltipText="Diferencia promedio en la evaluación de la posición en los momentos finales y críticos de la partida. Los humanos tienden a empeorar, no a mejorar."
+              />
+              <MetricDisplay
+                label="Porcentaje de Partidas 'Clutch'"
+                value={`${formatNumber(metrics.clutch_accuracy.clutch_games_pct * 100)}%`}
+                tooltipText="Porcentaje de partidas donde el jugador mostró una precisión inusualmente alta en situaciones de alta presión."
+              />
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   )
@@ -435,7 +494,11 @@ function ResultsSkeleton() {
           <Skeleton className="h-80 lg:col-span-3 rounded-lg bg-gray-800" />
           <Skeleton className="h-80 lg:col-span-2 rounded-lg bg-gray-800" />
         </div>
-        <Skeleton className="h-80 rounded-lg bg-gray-800" />
+        <Skeleton className="h-80 rounded-lg bg-gray-800 mb-8" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Skeleton className="h-56 rounded-lg bg-gray-800" />
+          <Skeleton className="h-56 rounded-lg bg-gray-800" />
+        </div>
       </main>
     </div>
   )

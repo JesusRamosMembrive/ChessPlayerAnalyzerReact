@@ -2,18 +2,48 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Search, TrendingUp, Clock, BarChart3, Zap } from "lucide-react"
+import { Search, TrendingUp, Clock, BarChart3, Zap, Loader2 } from "lucide-react"
 import { PlayersList } from "@/components/players-list"
+import { useToast } from "@/hooks/use-toast"
+import { analyzePlayer } from "@/lib/chess-api"
 
 export default function ChessAnalyzerHome() {
   const [username, setUsername] = useState("")
   const router = useRouter()
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+
+  const analyzeMutation = useMutation({
+    mutationFn: analyzePlayer,
+    onSuccess: (data) => {
+      toast({
+        title: "Analysis Started",
+        description: `Analysis for ${username} has been queued (Task: ${data.task_id})`,
+      })
+      queryClient.invalidateQueries({ queryKey: ["players"] })
+      setUsername("")
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Failed to start analysis",
+        variant: "destructive",
+      })
+    },
+  })
 
   const handleAnalysisClick = (username: string) => {
     router.push(`/results?user=${username}`)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!username.trim()) return
+    analyzeMutation.mutate(username.trim())
   }
 
   return (
@@ -48,15 +78,29 @@ export default function ChessAnalyzerHome() {
                 <CardDescription className="text-white">Enter a chess.com username to analyze</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Input
-                  placeholder="Enter chess.com username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                />
-                <Button className="w-full bg-green-600 hover:bg-green-700" disabled={!username.trim()}>
-                  Start Analysis
-                </Button>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <Input
+                    placeholder="Enter chess.com username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    disabled={analyzeMutation.isPending}
+                  />
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-green-600 hover:bg-green-700" 
+                    disabled={!username.trim() || analyzeMutation.isPending}
+                  >
+                    {analyzeMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Starting Analysis...
+                      </>
+                    ) : (
+                      "Start Analysis"
+                    )}
+                  </Button>
+                </form>
               </CardContent>
             </Card>
           </div>

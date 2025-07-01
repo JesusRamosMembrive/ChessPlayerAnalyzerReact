@@ -350,7 +350,7 @@ export function PlayersList({ onError }: PlayersListProps) {
                   ) : (
                     <div className="flex items-center space-x-1">
                       <Calendar className="w-3 h-3" />
-                      <span>Started: {formatDate(player.requested_at)}</span>
+                      <span>Started: {formatDate(player.requested_at || "")}</span>
                     </div>
                   )}
                 </div>

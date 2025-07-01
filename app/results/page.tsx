@@ -18,11 +18,13 @@ import {
   Castle,
   Clock,
   Target,
+  Users,
 } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import type { PlayerMetricsDetail } from "@/lib/types"
 import { MetricDisplay } from "./components/metric-display"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Progress } from "@/components/ui/progress"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
 
 // Helper to format numbers
@@ -37,6 +39,25 @@ const getRiskColor = (score: number) => {
   if (score > 50) return "text-orange-400"
   if (score > 25) return "text-yellow-400"
   return "text-green-400"
+}
+
+// Helper to get percentile color
+const getPercentileColor = (percentile: number) => {
+  if (percentile >= 90) return "text-red-400"
+  if (percentile >= 75) return "text-orange-400"
+  if (percentile >= 50) return "text-yellow-400"
+  if (percentile >= 25) return "text-blue-400"
+  return "text-green-400"
+}
+
+// Helper to get percentile description
+const getPercentileDescription = (percentile: number) => {
+  if (percentile >= 95) return "Excepcional (Top 5%)"
+  if (percentile >= 90) return "Muy Alto (Top 10%)"
+  if (percentile >= 75) return "Alto (Top 25%)"
+  if (percentile >= 50) return "Por Encima de la Media"
+  if (percentile >= 25) return "Por Debajo de la Media"
+  return "Bajo (Bottom 25%)"
 }
 
 export default function AnalysisResults() {
@@ -453,6 +474,104 @@ export default function AnalysisResults() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Fifth Block - Benchmarking */}
+        <Card className="bg-gray-800 border-gray-700 mb-8">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center">
+              <Users className="mr-2 text-emerald-400" /> Benchmarking vs Pares
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              Comparación con jugadores de ELO similar (±200 puntos).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* ACPL Percentile */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-lg font-semibold text-white">Calidad de Juego (ACPL)</h4>
+                  <span className={`text-lg font-bold ${getPercentileColor(metrics.benchmark.percentile_acpl)}`}>
+                    Percentil {metrics.benchmark.percentile_acpl}
+                  </span>
+                </div>
+                <Progress value={metrics.benchmark.percentile_acpl} className="h-3" />
+                <div className="flex justify-between text-sm text-gray-400">
+                  <span>Peor</span>
+                  <span className={getPercentileColor(metrics.benchmark.percentile_acpl)}>
+                    {getPercentileDescription(metrics.benchmark.percentile_acpl)}
+                  </span>
+                  <span>Mejor</span>
+                </div>
+                <div className="bg-gray-700/50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-300">
+                    <strong>Interpretación:</strong>{" "}
+                    {metrics.benchmark.percentile_acpl >= 90
+                      ? "Su ACPL está en el top 10% - excepcionalmente bajo para su nivel. Esto puede ser sospechoso."
+                      : metrics.benchmark.percentile_acpl >= 75
+                        ? "Su ACPL está por encima del promedio de jugadores similares."
+                        : metrics.benchmark.percentile_acpl >= 25
+                          ? "Su ACPL está dentro del rango normal para jugadores de su nivel."
+                          : "Su ACPL está por debajo del promedio, lo cual es típico para jugadores en desarrollo."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Entropy Percentile */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-lg font-semibold text-white">Diversidad de Aperturas</h4>
+                  <span className={`text-lg font-bold ${getPercentileColor(metrics.benchmark.percentile_entropy)}`}>
+                    Percentil {metrics.benchmark.percentile_entropy}
+                  </span>
+                </div>
+                <Progress value={metrics.benchmark.percentile_entropy} className="h-3" />
+                <div className="flex justify-between text-sm text-gray-400">
+                  <span>Menos Diverso</span>
+                  <span className={getPercentileColor(metrics.benchmark.percentile_entropy)}>
+                    {getPercentileDescription(metrics.benchmark.percentile_entropy)}
+                  </span>
+                  <span>Más Diverso</span>
+                </div>
+                <div className="bg-gray-700/50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-300">
+                    <strong>Interpretación:</strong>{" "}
+                    {metrics.benchmark.percentile_entropy >= 75
+                      ? "Tiene un repertorio de aperturas muy diverso comparado con sus pares."
+                      : metrics.benchmark.percentile_entropy >= 25
+                        ? "Su diversidad de aperturas está dentro del rango normal."
+                        : "Tiende a jugar un repertorio más limitado de aperturas, lo cual puede ser una estrategia válida."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Comparison with Peers */}
+            <div className="mt-8 pt-6 border-t border-gray-700">
+              <h4 className="text-lg font-semibold text-white mb-4">Comparación Directa con Pares</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <MetricDisplay
+                  label="Diferencia en ACPL vs Pares"
+                  value={
+                    metrics.peer_delta_acpl > 0
+                      ? `+${formatNumber(metrics.peer_delta_acpl)} (peor)`
+                      : `${formatNumber(metrics.peer_delta_acpl)} (mejor)`
+                  }
+                  tooltipText="Diferencia en ACPL comparado con jugadores de ELO similar. Valores negativos indican mejor rendimiento."
+                />
+                <MetricDisplay
+                  label="Diferencia en Coincidencia vs Pares"
+                  value={
+                    metrics.peer_delta_match > 0
+                      ? `+${formatNumber(metrics.peer_delta_match * 100)}% (mayor)`
+                      : `${formatNumber(metrics.peer_delta_match * 100)}% (menor)`
+                  }
+                  tooltipText="Diferencia en tasa de coincidencia con el módulo comparado con jugadores similares. Valores muy altos pueden ser sospechosos."
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   )
@@ -499,6 +618,7 @@ function ResultsSkeleton() {
           <Skeleton className="h-56 rounded-lg bg-gray-800" />
           <Skeleton className="h-56 rounded-lg bg-gray-800" />
         </div>
+        <Skeleton className="h-96 rounded-lg bg-gray-800 mb-8" />
       </main>
     </div>
   )

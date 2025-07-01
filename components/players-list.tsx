@@ -26,9 +26,10 @@ import { History, User, Calendar, RefreshCw, AlertCircle, Trash2 } from "lucide-
 interface PlayersListProps {
   onError?: (error: any) => void
   onPlayerClick?: (username: string) => void
+  onRefetch?: (refetchFn: () => Promise<void>) => void
 }
 
-export function PlayersList({ onError }: PlayersListProps) {
+export function PlayersList({ onError, onRefetch }: PlayersListProps) {
   const [players, setPlayers] = useState<PlayerListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -252,6 +253,13 @@ export function PlayersList({ onError }: PlayersListProps) {
   useEffect(() => {
     fetchPlayers(false)
   }, [])
+
+  // Expose the fetchPlayers function to parent components
+  useEffect(() => {
+    if (onRefetch) {
+      onRefetch(() => fetchPlayers(true))
+    }
+  }, [onRefetch])
 
   const getStatusBadge = (status: string) => {
     switch (status) {

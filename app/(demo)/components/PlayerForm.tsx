@@ -11,7 +11,11 @@ import { useToast } from "@/hooks/use-toast"
 import { analyzePlayer } from "@/lib/chess-api"
 import { Search, Loader2 } from "lucide-react"
 
-export function PlayerForm() {
+interface PlayerFormProps {
+  refetchPlayers?: (() => Promise<void>) | null
+}
+
+export function PlayerForm({ refetchPlayers }: PlayerFormProps) {
   const [username, setUsername] = useState("")
   const { toast } = useToast()
   const queryClient = useQueryClient()
@@ -25,6 +29,14 @@ export function PlayerForm() {
       })
       // Invalidate to trigger refetch
       queryClient.invalidateQueries({ queryKey: ["player", username] })
+
+      // Refetch players list to add the new player card automatically
+      if (refetchPlayers) {
+        refetchPlayers().catch(err => {
+          console.error("Failed to refetch players:", err);
+        });
+      }
+
       setUsername("")
     },
     onError: (error: any) => {

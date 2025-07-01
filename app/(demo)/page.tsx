@@ -21,6 +21,7 @@ const queryClient = new QueryClient({
 
 export default function DemoPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<string>("")
+  const [refetchPlayers, setRefetchPlayers] = useState<(() => Promise<void>) | null>(null)
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -37,7 +38,7 @@ export default function DemoPage() {
             {" "}
             {/* Increased gap */}
             <div className="flex justify-center">
-              <PlayerForm />
+              <PlayerForm refetchPlayers={refetchPlayers} />
             </div>
             <div className="space-y-4">
               <div>
@@ -62,7 +63,10 @@ export default function DemoPage() {
             </div>
             {/* New PlayersList section */}
             <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
-              <PlayersList onError={(error) => console.error("PlayersList external error:", error)} />
+              <PlayersList 
+                onError={(error) => console.error("PlayersList external error:", error)} 
+                onRefetch={setRefetchPlayers}
+              />
             </div>
           </div>
         </div>

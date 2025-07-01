@@ -12,20 +12,20 @@ This directory contains the QML port of the Chess Player Analyzer React applicat
 ## Running the Application
 
 1. Install Qt with QML support:
-   ```bash
+   \`\`\`bash
    sudo apt-get install qml-module-qtquick2 qml-module-qtquick-controls2
-   ```
+   \`\`\`
 
 2. Run the application:
-   ```bash
+   \`\`\`bash
    chmod +x run.sh
    ./run.sh
-   ```
+   \`\`\`
 
    Or directly:
-   ```bash
+   \`\`\`bash
    qml main.qml
-   ```
+   \`\`\`
 
 ## Features Implemented
 

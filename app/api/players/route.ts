@@ -3,7 +3,7 @@ import { AbortSignal } from "abort-controller"
 
 //const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http:localhost:8000"
 
-const API_URL = "https://6170-87-221-57-241.ngrok-free.app"
+const API_URL = "https://d68a-87-221-57-241.ngrok-free.app"
 
 console.log("Attempting to connect to backend:", `${API_URL}/players`)
 

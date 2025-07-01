@@ -1,0 +1,113 @@
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Search, TrendingUp, Clock, BarChart3, Zap } from "lucide-react"
+import { PlayersList } from "@/components/players-list"
+
+export default function ChessAnalyzerHome() {
+  const [username, setUsername] = useState("")
+  const router = useRouter()
+
+  const handleAnalysisClick = (username: string) => {
+    router.push(`/results?user=${username}`)
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      {/* Header */}
+      <header className="border-b border-gray-800 bg-black/50 backdrop-blur-sm">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <h1 className="text-xl font-bold">Chess Analyzer</h1>
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-6 py-12">
+        <div className="max-w-4xl mx-auto">
+          {/* Main Analysis Section */}
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold mb-4">Analyze Chess Performance</h2>
+            <p className="text-gray-400 text-lg mb-8">
+              Discover patterns, detect anomalies, and gain insights from chess.com game data
+            </p>
+
+            <Card className="bg-gray-800 border-gray-700 max-w-md mx-auto">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2 text-white">
+                  <Search className="w-5 h-5" />
+                  <span className="text-white">New Analysis</span>
+                </CardTitle>
+                <CardDescription className="text-white">Enter a chess.com username to analyze</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Input
+                  placeholder="Enter chess.com username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                />
+                <Button className="w-full bg-green-600 hover:bg-green-700" disabled={!username.trim()}>
+                  Start Analysis
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Features Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-6 text-center">
+                <div className="w-12 h-12 bg-blue-600/20 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <BarChart3 className="w-6 h-6 text-blue-400" />
+                </div>
+                <h3 className="font-semibold mb-2 text-white">Opening Entropy</h3>
+                <p className="text-sm text-gray-400">Analyze opening diversity vs ELO consistency</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-6 text-center">
+                <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Clock className="w-6 h-6 text-purple-400" />
+                </div>
+                <h3 className="font-semibold mb-2 text-white">Move Timing</h3>
+                <p className="text-sm text-gray-400">Detect suspicious timing patterns</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-6 text-center">
+                <div className="w-12 h-12 bg-green-600/20 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <TrendingUp className="w-6 h-6 text-green-400" />
+                </div>
+                <h3 className="font-semibold mb-2 text-white">Win/Loss Stats</h3>
+                <p className="text-sm text-gray-400">Comprehensive game outcome analysis</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-6 text-center">
+                <div className="w-12 h-12 bg-orange-600/20 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Zap className="w-6 h-6 text-orange-400" />
+                </div>
+                <h3 className="font-semibold mb-2 text-white">Comeback Analysis</h3>
+                <p className="text-sm text-gray-400">Identify dramatic game turnarounds</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Analyzed Players List */}
+          <PlayersList onError={(error) => console.error("Failed to load players:", error)} />
+        </div>
+      </div>
+    </div>
+  )
+}

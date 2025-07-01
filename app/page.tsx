@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
@@ -12,8 +14,9 @@ import { Search, TrendingUp, Clock, BarChart3, Zap, Loader2 } from "lucide-react
 import { useToast } from "@/hooks/use-toast"
 import { analyzePlayer } from "@/lib/chess-api"
 import { Toaster } from "@/components/ui/toaster"
+import type { PlayerListItem } from "@/lib/types"
 
-const PlayersList = dynamic(() => import("@/components/players-list").then(mod => ({ default: mod.PlayersList })), {
+const PlayersList = dynamic(() => import("@/components/players-list").then((mod) => ({ default: mod.PlayersList })), {
   ssr: false,
   loading: () => (
     <Card className="bg-gray-800 border-gray-700">
@@ -30,7 +33,7 @@ const PlayersList = dynamic(() => import("@/components/players-list").then(mod =
         </div>
       </CardContent>
     </Card>
-  )
+  ),
 })
 
 const queryClient = new QueryClient({
@@ -53,7 +56,22 @@ function ChessAnalyzerHomeContent() {
 
   const analyzeMutation = useMutation({
     mutationFn: analyzePlayer,
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
+      // Add player to list immediately with pending status
+      const newPlayer: PlayerListItem = {
+        username: variables,
+        status: "pending",
+        progress: 0,
+        requested_at: new Date().toISOString(),
+        total_games: 0,
+        done_games: 0,
+      }
+
+      // Add player to the list via global function
+      if (typeof window !== "undefined" && (window as any).addPlayerToList) {
+        ;(window as any).addPlayerToList(newPlayer)
+      }
+
       toast({
         title: "Analysis Started",
         description: `Analysis for ${username} has been queued (Task: ${data.task_id})`,
@@ -120,9 +138,9 @@ function ChessAnalyzerHomeContent() {
                     className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                     disabled={analyzeMutation.isPending}
                   />
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-green-600 hover:bg-green-700" 
+                  <Button
+                    type="submit"
+                    className="w-full bg-green-600 hover:bg-green-700"
                     disabled={!username.trim() || analyzeMutation.isPending}
                   >
                     {analyzeMutation.isPending ? (

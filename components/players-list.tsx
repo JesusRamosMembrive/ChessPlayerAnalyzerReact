@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { PlayerListItemSchema, type PlayerListItem } from "@/lib/types"
+import { useProgressPolling } from "@/hooks/useProgressPolling"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,9 +27,10 @@ import { History, User, Calendar, RefreshCw, AlertCircle, Trash2 } from "lucide-
 interface PlayersListProps {
   onError?: (error: any) => void
   onPlayerClick?: (username: string) => void
+  onPlayerAdded?: (player: PlayerListItem) => void
 }
 
-export function PlayersList({ onError }: PlayersListProps) {
+export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
   const [players, setPlayers] = useState<PlayerListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +39,38 @@ export function PlayersList({ onError }: PlayersListProps) {
   const [deletingPlayer, setDeletingPlayer] = useState<string | null>(null)
   const { toast } = useToast()
   const router = useRouter()
+
+  // Use progress polling hook
+  const { isPolling } = useProgressPolling({ players, setPlayers })
+
+  // Function to add a new player to the list
+  const addPlayer = (newPlayer: PlayerListItem) => {
+    setPlayers((currentPlayers) => {
+      // Check if player already exists
+      const exists = currentPlayers.some((p) => p.username === newPlayer.username)
+      if (exists) {
+        // Update existing player
+        return currentPlayers.map((p) => (p.username === newPlayer.username ? { ...p, ...newPlayer } : p))
+      }
+      // Add new player at the beginning
+      return [newPlayer, ...currentPlayers]
+    })
+    onPlayerAdded?.(newPlayer)
+  }
+
+  // Expose addPlayer function globally so it can be called from parent
+  useEffect(() => {
+    // Store the function in a global reference that can be accessed
+    if (typeof window !== "undefined") {
+      ;(window as any).addPlayerToList = addPlayer
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        delete (window as any).addPlayerToList
+      }
+    }
+  }, [])
 
   const fetchPlayers = async (showToast = true) => {
     try {
@@ -325,6 +359,12 @@ export function PlayersList({ onError }: PlayersListProps) {
           <div className="flex items-center space-x-2">
             <History className="w-5 h-5" />
             <span>Analyzed Players</span>
+            {isPolling && (
+              <div className="flex items-center space-x-1 text-xs text-yellow-400">
+                <div className="animate-spin rounded-full h-3 w-3 border-b border-yellow-400"></div>
+                <span>Updating...</span>
+              </div>
+            )}
           </div>
           {error && (
             <Button
@@ -394,7 +434,7 @@ export function PlayersList({ onError }: PlayersListProps) {
                     {/* Progress bar for pending status */}
                     {player.status === "pending" && player.progress !== undefined && (
                       <div className="mb-2">
-                        <Progress value={player.progress} className="h-1" />
+                        <Progress value={player.progress} className="h-2" />
                         <p className="text-xs text-gray-400 mt-1">{player.progress}% complete</p>
                       </div>
                     )}

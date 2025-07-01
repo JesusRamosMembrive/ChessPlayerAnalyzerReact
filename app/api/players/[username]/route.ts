@@ -2,6 +2,69 @@ import { type NextRequest, NextResponse } from "next/server"
 
 const API_URL = "https://31cc-87-221-57-241.ngrok-free.app"
 
+export async function GET(request: NextRequest, { params }: { params: Promise<{ username: string }> }) {
+  try {
+    const { username } = await params
+
+    if (!username) {
+      return NextResponse.json({ error: "Username is required" }, { status: 400 })
+    }
+
+    console.log(`Fetching player info: ${username}`)
+
+    const backendUrl = `${API_URL.replace(/\/$/, "")}/players/${username}`
+    console.log(`Full backend URL: ${backendUrl}`)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+    const response = await fetch(backendUrl, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+        "User-Agent": "NextJS-API-Route",
+      },
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    console.log(`Backend response status: ${response.status}`)
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "Unknown error")
+      console.error(`Backend error response: ${errorText}`)
+
+      if (response.status === 404) {
+        return NextResponse.json({ error: `Player '${username}' not found` }, { status: 404 })
+      }
+
+      return NextResponse.json(
+        {
+          error: `Backend error: ${response.status} ${response.statusText}`,
+          details: errorText,
+        },
+        { status: response.status },
+      )
+    }
+
+    const data = await response.json()
+    console.log(`Player info received:`, data)
+
+    return NextResponse.json(data)
+  } catch (error: any) {
+    console.error("Error fetching player info:", error)
+
+    if (error.name === "AbortError") {
+      return NextResponse.json({ error: "Request timeout" }, { status: 408 })
+    }
+
+    return NextResponse.json({ error: "Internal server error", details: error.message }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ username: string }> }) {
   try {
     const { username } = await params
@@ -52,17 +115,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       )
     }
 
-    // Manejar respuesta exitosa - 204 No Content no tiene JSON
-    let data
+    // Handle 204 No Content (successful deletion with no response body)
     if (response.status === 204) {
-      // 204 No Content - operación exitosa sin contenido
-      data = { message: `Player '${username}' deleted successfully` }
       console.log(`Player '${username}' deleted successfully (204 No Content)`)
-    } else {
-      // Otras respuestas exitosas con contenido JSON
-      data = await response.json()
-      console.log(`Player deletion response:`, data)
+      return NextResponse.json({ message: `Player '${username}' deleted successfully` })
     }
+
+    // For other successful responses, try to parse JSON
+    const data = await response.json()
+    console.log(`Player deletion response:`, data)
 
     return NextResponse.json(data)
   } catch (error: any) {

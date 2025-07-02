@@ -1,15 +1,7 @@
 import { z } from "zod"
 import {
-  PlayerSchema,
-  TaskSchema,
-  GameSchema,
-  PlayerMetricsSchema,
-  GameMetricsSchema,
-  type Player,
-  type Task,
-  type Game,
-  type PlayerMetrics,
-  type GameMetrics,
+  PlayerMetricsDetailSchema as PlayerMetricsSchema,
+  type PlayerMetricsDetail as PlayerMetrics,
 } from "./types"
 
 class ChessApiError extends Error {
@@ -66,20 +58,45 @@ async function retryRequest<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay =
   throw lastError!
 }
 
-export async function getPlayer(username: string, signal?: AbortSignal): Promise<Player> {
+export interface AnalysisResponse {
+  task_id: string
+  message: string
+}
+
+export async function getPlayer(username: string, signal?: AbortSignal): Promise<any> {
   return retryRequest(() =>
     apiRequest(`/players/${username}`, {
-      schema: PlayerSchema,
       signal,
     }),
   )
 }
 
-export async function analyzePlayer(username: string): Promise<{ task_id: string }> {
-  return apiRequest(`/players/${username}`, {
-    method: "POST",
-    schema: z.object({ task_id: z.string() }),
+export async function analyzePlayer(username: string): Promise<AnalysisResponse> {
+  console.log(`Starting analysis for player: ${username}`)
+  
+  const response = await fetch(`/api/players/${username}`, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
   })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error('Analysis API error:', errorData)
+    
+    throw new Error(
+      errorData.error || 
+      errorData.details || 
+      `HTTP ${response.status}: ${response.statusText}`
+    )
+  }
+
+  const data = await response.json()
+  console.log('Analysis response:', data)
+  
+  return data
 }
 
 export async function refreshPlayer(username: string): Promise<{ task_id: string }> {
@@ -103,19 +120,17 @@ export async function deletePlayer(username: string): Promise<{ message: string 
   })
 }
 
-export async function taskStatus(taskId: string, signal?: AbortSignal): Promise<Task> {
+export async function taskStatus(taskId: string, signal?: AbortSignal): Promise<any> {
   return retryRequest(() =>
     apiRequest(`/tasks/${taskId}`, {
-      schema: TaskSchema,
       signal,
     }),
   )
 }
 
-export async function gameDetail(gameId: string, signal?: AbortSignal): Promise<Game> {
+export async function gameDetail(gameId: string, signal?: AbortSignal): Promise<any> {
   return retryRequest(() =>
     apiRequest(`/games/${gameId}`, {
-      schema: GameSchema,
       signal,
     }),
   )
@@ -130,10 +145,9 @@ export async function playerMetrics(username: string, signal?: AbortSignal): Pro
   )
 }
 
-export async function gameMetrics(gameId: string, signal?: AbortSignal): Promise<GameMetrics> {
+export async function gameMetrics(gameId: string, signal?: AbortSignal): Promise<any> {
   return retryRequest(() =>
     apiRequest(`/metrics/game/${gameId}`, {
-      schema: GameMetricsSchema,
       signal,
     }),
   )

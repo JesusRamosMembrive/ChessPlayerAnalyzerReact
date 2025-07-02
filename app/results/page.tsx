@@ -29,8 +29,14 @@ import type { PlayerMetricsDetail } from "@/lib/types"
 import { MetricDisplay } from "./components/metric-display"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Progress } from "@/components/ui/progress"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from "recharts"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart"
 
 // Helper to format numbers
 const formatNumber = (num: number, decimals = 2) => {
@@ -104,20 +110,20 @@ export default function AnalysisResults() {
   const phaseQualityData = useMemo(() => {
     if (!metrics?.phase_quality) return []
     return [
-      { 
-        name: "Apertura", 
+      {
+        name: "Apertura",
         acpl: metrics.phase_quality.opening_acpl,
-        fill: "#8b5cf6"
+        fill: "#8b5cf6",
       },
-      { 
-        name: "Medio Juego", 
+      {
+        name: "Medio Juego",
         acpl: metrics.phase_quality.middlegame_acpl,
-        fill: "#06b6d4"
+        fill: "#06b6d4",
       },
-      { 
-        name: "Final", 
+      {
+        name: "Final",
         acpl: metrics.phase_quality.endgame_acpl,
-        fill: "#10b981"
+        fill: "#10b981",
       },
     ]
   }, [metrics])
@@ -127,7 +133,7 @@ export default function AnalysisResults() {
     const blunderRate = metrics.phase_quality.blunder_rate * 100
     return [
       { name: "Errores Graves", value: blunderRate, fill: "#ef4444" },
-      { name: "Jugadas Normales", value: 100 - blunderRate, fill: "#6b7280" }
+      { name: "Jugadas Normales", value: 100 - blunderRate, fill: "#6b7280" },
     ]
   }, [metrics])
 
@@ -137,7 +143,7 @@ export default function AnalysisResults() {
       color: "#8b5cf6",
     },
     medioJuego: {
-      label: "Medio Juego", 
+      label: "Medio Juego",
       color: "#06b6d4",
     },
     final: {
@@ -166,7 +172,7 @@ export default function AnalysisResults() {
       <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
         <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
         <h2 className="text-2xl font-bold mb-2">Error al cargar los datos</h2>
-        <p className="text-gray-400 mb-6">{error}</p>
+        <p className="text-gray-400 mb-6 text-base">{error}</p>
         <Button onClick={() => router.push("/")}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Volver al inicio
@@ -238,7 +244,7 @@ export default function AnalysisResults() {
               <div className={`text-4xl font-bold ${riskScoreColor}`}>
                 {formatNumber(metrics.risk.risk_score, 0)}/100
               </div>
-              <p className="text-xs text-gray-500">Evaluación general de sospecha</p>
+              <p className="text-sm text-gray-500">Evaluación general de sospecha</p>
             </CardContent>
           </Card>
           <Card className="bg-gray-800 border-gray-700">
@@ -247,8 +253,8 @@ export default function AnalysisResults() {
               <BarChart3 className="w-5 h-5 text-blue-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold">{metrics.games_analyzed}</div>
-              <p className="text-xs text-gray-500">
+              <div className="text-4xl font-bold text-green-500 ">{metrics.games_analyzed}</div>
+              <p className="text-sm text-gray-500">
                 Del {new Date(metrics.first_game_date).toLocaleDateString()} al{" "}
                 {new Date(metrics.last_game_date).toLocaleDateString()}
               </p>
@@ -260,8 +266,8 @@ export default function AnalysisResults() {
               <Gauge className="w-5 h-5 text-purple-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold">{formatNumber(metrics.avg_ipr, 0)}</div>
-              <p className="text-xs text-gray-500">ELO estimado según sus jugadas</p>
+              <div className="text-4xl font-bold text-green-500">{formatNumber(metrics.avg_ipr, 0)}</div>
+              <p className="text-sm text-gray-500">ELO estimado según sus jugadas</p>
             </CardContent>
           </Card>
           <Card className="bg-gray-800 border-gray-700">
@@ -275,7 +281,7 @@ export default function AnalysisResults() {
               >
                 {metrics.step_function_detected ? "Detectada" : "No"}
               </div>
-              <p className="text-xs text-gray-500">Magnitud: {formatNumber(metrics.step_function_magnitude, 0)}</p>
+              <p className="text-sm text-gray-500">Magnitud: {formatNumber(metrics.step_function_magnitude, 0)}</p>
             </CardContent>
           </Card>
         </div>
@@ -287,11 +293,11 @@ export default function AnalysisResults() {
               <CardTitle className="text-white flex items-center">
                 <BrainCircuit className="mr-2 text-blue-400" /> Métricas de Calidad
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription className="text-gray-400 text-base">
                 Indicadores de la calidad y consistencia del juego.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <MetricDisplay
                 label="Pérdida Media de Centipeones (ACPL)"
                 value={formatNumber(metrics.avg_acpl)}
@@ -325,7 +331,7 @@ export default function AnalysisResults() {
               <CardTitle className="text-white flex items-center">
                 <ShieldCheck className="mr-2 text-red-400" /> Factores de Riesgo
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription className="text-gray-400 text-base">
                 Factores específicos que contribuyen a la puntuación de riesgo.
               </CardDescription>
             </CardHeader>
@@ -333,12 +339,12 @@ export default function AnalysisResults() {
               {Object.entries(metrics.risk.risk_factors).length > 0 ? (
                 Object.entries(metrics.risk.risk_factors).map(([factor, value]) => (
                   <div key={factor} className="flex items-center justify-between">
-                    <p className="text-sm text-gray-300 capitalize">{factor.replace(/_/g, " ")}</p>
-                    <p className="text-sm font-semibold text-red-400">{formatNumber(value * 100, 0)}%</p>
+                    <p className="text-base text-gray-300 capitalize">{factor.replace(/_/g, " ")}</p>
+                    <p className="text-base font-semibold text-red-400">{formatNumber(value * 100, 0)}%</p>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-400 text-center py-4">
+                <p className="text-base text-gray-400 text-center py-4">
                   No se detectaron factores de riesgo específicos.
                 </p>
               )}
@@ -360,24 +366,24 @@ export default function AnalysisResults() {
               <CardTitle className="text-white flex items-center">
                 <LineChartIcon className="mr-2 text-green-400" /> Análisis Longitudinal (ROI)
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription className="text-gray-400 text-base">
                 Métricas clave del rendimiento del jugador a lo largo del tiempo.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
               <div className="flex flex-col items-center justify-center p-4 bg-gray-700/30 rounded-lg">
                 <Activity className="w-8 h-8 text-green-400 mb-2" />
-                <p className="text-sm text-gray-400 mb-1">ROI Medio</p>
+                <p className="text-base text-gray-400 mb-1">ROI Medio</p>
                 <p className="text-5xl font-bold text-green-400">{formatNumber(metrics.roi_mean, 0)}</p>
               </div>
               <div className="flex flex-col items-center justify-center p-4 bg-gray-700/30 rounded-lg">
                 <Maximize className="w-8 h-8 text-blue-400 mb-2" />
-                <p className="text-sm text-gray-400 mb-1">ROI Máximo</p>
+                <p className="text-base text-gray-400 mb-1">ROI Máximo</p>
                 <p className="text-5xl font-bold text-blue-400">{formatNumber(metrics.roi_max, 0)}</p>
               </div>
               <div className="flex flex-col items-center justify-center p-4 bg-gray-700/30 rounded-lg">
                 <Sigma className="w-8 h-8 text-purple-400 mb-2" />
-                <p className="text-sm text-gray-400 mb-1">Desviación ROI</p>
+                <p className="text-base text-gray-400 mb-1">Desviación ROI</p>
                 <p className="text-5xl font-bold text-purple-400">{formatNumber(metrics.roi_std, 0)}</p>
               </div>
             </CardContent>
@@ -388,7 +394,7 @@ export default function AnalysisResults() {
               <CardTitle className="text-white flex items-center">
                 <TrendingUp className="mr-2 text-orange-400" /> Tendencias
               </CardTitle>
-              <CardDescription className="text-gray-400">Análisis de tendencias temporales.</CardDescription>
+              <CardDescription className="text-gray-400 text-base">Análisis de tendencias temporales.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
@@ -399,7 +405,7 @@ export default function AnalysisResults() {
                 />
                 <div className="mt-2">
                   <Progress value={Math.min(Math.abs(metrics.performance.trend_acpl) / 10, 100)} className="h-2" />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-sm text-gray-500 mt-1">
                     {metrics.performance.trend_acpl < -50
                       ? "Mejora significativa"
                       : metrics.performance.trend_acpl < 0
@@ -422,7 +428,7 @@ export default function AnalysisResults() {
                     value={Math.min(Math.abs(metrics.performance.trend_match_rate) * 1000, 100)}
                     className="h-2"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-sm text-gray-500 mt-1">
                     {metrics.performance.trend_match_rate > 0.05
                       ? "Aumento significativo"
                       : metrics.performance.trend_match_rate > 0
@@ -436,7 +442,7 @@ export default function AnalysisResults() {
 
               <div className="pt-4 border-t border-gray-700">
                 <div className="text-center">
-                  <p className="text-sm text-gray-400 mb-2">Evaluación de Tendencia</p>
+                  <p className="text-base text-gray-400 mb-2">Evaluación de Tendencia</p>
                   <div
                     className={`text-2xl font-bold ${
                       metrics.performance.trend_acpl < -100 && metrics.performance.trend_match_rate > 0.02
@@ -464,7 +470,7 @@ export default function AnalysisResults() {
             <CardTitle className="text-white flex items-center">
               <BookOpen className="mr-2 text-yellow-400" /> Patrones de Apertura
             </CardTitle>
-            <CardDescription className="text-gray-400">Análisis del repertorio de aperturas.</CardDescription>
+            <CardDescription className="text-gray-400 text-base">Análisis del repertorio de aperturas.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -510,13 +516,13 @@ export default function AnalysisResults() {
             <CardTitle className="text-white flex items-center">
               <Castle className="mr-2 text-indigo-400" /> Calidad por Fase de Juego
             </CardTitle>
-            <CardDescription className="text-gray-400">
+            <CardDescription className="text-gray-400 text-base">
               Análisis del rendimiento (ACPL) en cada fase de la partida.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="bg-gray-900/50 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-300 mb-3">ACPL por Fase de Juego</h4>
+              <h4 className="text-base font-medium text-gray-300 mb-3">ACPL por Fase de Juego</h4>
               <ChartContainer config={phaseQualityChartConfig} className="h-[350px] w-full">
                 <BarChart data={phaseQualityData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -534,7 +540,7 @@ export default function AnalysisResults() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-gray-900/50 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-gray-300 mb-3">Distribución de Pérdidas por Fase</h4>
+                <h4 className="text-base font-medium text-gray-300 mb-3">Distribución de Pérdidas por Fase</h4>
                 <ChartContainer config={phaseQualityChartConfig} className="h-[250px] w-full">
                   <PieChart>
                     <Pie
@@ -557,7 +563,7 @@ export default function AnalysisResults() {
               </div>
 
               <div className="bg-gray-900/50 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-gray-300 mb-3">Tasa de Errores Graves</h4>
+                <h4 className="text-base font-medium text-gray-300 mb-3">Tasa de Errores Graves</h4>
                 <ChartContainer config={blunderChartConfig} className="h-[250px] w-full">
                   <PieChart>
                     <Pie
@@ -613,7 +619,9 @@ export default function AnalysisResults() {
               <CardTitle className="text-white flex items-center">
                 <Clock className="mr-2 text-cyan-400" /> Gestión del Tiempo
               </CardTitle>
-              <CardDescription className="text-gray-400">Análisis de los patrones de uso del tiempo.</CardDescription>
+              <CardDescription className="text-gray-400 text-base">
+                Análisis de los patrones de uso del tiempo.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <MetricDisplay
@@ -644,7 +652,7 @@ export default function AnalysisResults() {
               <CardTitle className="text-white flex items-center">
                 <Target className="mr-2 text-rose-400" /> Precisión Bajo Presión (Clutch)
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription className="text-gray-400 text-base">
                 Rendimiento en momentos críticos de la partida.
               </CardDescription>
             </CardHeader>
@@ -669,7 +677,7 @@ export default function AnalysisResults() {
             <CardTitle className="text-white flex items-center">
               <Users className="mr-2 text-emerald-400" /> Benchmarking vs Pares
             </CardTitle>
-            <CardDescription className="text-gray-400">
+            <CardDescription className="text-gray-400 text-base">
               Comparación con jugadores de ELO similar (±200 puntos).
             </CardDescription>
           </CardHeader>
@@ -684,7 +692,7 @@ export default function AnalysisResults() {
                   </span>
                 </div>
                 <Progress value={metrics.benchmark.percentile_acpl} className="h-3" />
-                <div className="flex justify-between text-sm text-gray-400">
+                <div className="flex justify-between text-base text-gray-400">
                   <span>Peor</span>
                   <span className={getPercentileColor(metrics.benchmark.percentile_acpl)}>
                     {getPercentileDescription(metrics.benchmark.percentile_acpl)}
@@ -692,7 +700,7 @@ export default function AnalysisResults() {
                   <span>Mejor</span>
                 </div>
                 <div className="bg-gray-700/50 p-3 rounded-lg">
-                  <p className="text-sm text-gray-300">
+                  <p className="text-base text-gray-300">
                     <strong>Interpretación:</strong>{" "}
                     {metrics.benchmark.percentile_acpl >= 90
                       ? "Su ACPL está en el top 10% - excepcionalmente bajo para su nivel. Esto puede ser sospechoso."
@@ -714,7 +722,7 @@ export default function AnalysisResults() {
                   </span>
                 </div>
                 <Progress value={metrics.benchmark.percentile_entropy} className="h-3" />
-                <div className="flex justify-between text-sm text-gray-400">
+                <div className="flex justify-between text-base text-gray-400">
                   <span>Menos Diverso</span>
                   <span className={getPercentileColor(metrics.benchmark.percentile_entropy)}>
                     {getPercentileDescription(metrics.benchmark.percentile_entropy)}
@@ -722,7 +730,7 @@ export default function AnalysisResults() {
                   <span>Más Diverso</span>
                 </div>
                 <div className="bg-gray-700/50 p-3 rounded-lg">
-                  <p className="text-sm text-gray-300">
+                  <p className="text-base text-gray-300">
                     <strong>Interpretación:</strong>{" "}
                     {metrics.benchmark.percentile_entropy >= 75
                       ? "Tiene un repertorio de aperturas muy diverso comparado con sus pares."
@@ -768,7 +776,7 @@ export default function AnalysisResults() {
               <CardTitle className="text-white flex items-center">
                 <Zap className="mr-2 text-amber-400" /> Análisis Táctico
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription className="text-gray-400 text-base">
                 Patrones de precisión táctica y rachas de jugadas perfectas.
               </CardDescription>
             </CardHeader>
@@ -809,7 +817,7 @@ export default function AnalysisResults() {
               <CardTitle className="text-white flex items-center">
                 <Castle className="mr-2 text-violet-400" /> Análisis de Finales
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription className="text-gray-400 text-base">
                 Eficiencia y precisión en la fase final de la partida.
               </CardDescription>
             </CardHeader>
@@ -839,7 +847,7 @@ export default function AnalysisResults() {
             <CardTitle className="text-white flex items-center">
               <ShieldCheck className="mr-2 text-blue-400" /> Resumen del Análisis
             </CardTitle>
-            <CardDescription className="text-gray-400">
+            <CardDescription className="text-gray-400 text-base">
               Evaluación integral basada en todas las métricas analizadas.
             </CardDescription>
           </CardHeader>
@@ -849,19 +857,19 @@ export default function AnalysisResults() {
                 <div className={`text-3xl font-bold mb-2 ${riskScoreColor}`}>
                   {formatNumber(metrics.risk.risk_score, 0)}/100
                 </div>
-                <p className="text-sm text-gray-400">Puntuación de Riesgo Final</p>
+                <p className="text-base text-gray-400">Puntuación de Riesgo Final</p>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold mb-2 text-blue-400">{metrics.games_analyzed}</div>
-                <p className="text-sm text-gray-400">Partidas Analizadas</p>
+                <p className="text-base text-gray-400">Partidas Analizadas</p>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold mb-2 text-purple-400">{metrics.risk.suspicious_games_count}</div>
-                <p className="text-sm text-gray-400">Partidas Sospechosas</p>
+                <p className="text-base text-gray-400">Partidas Sospechosas</p>
               </div>
             </div>
             <div className="mt-6 p-4 bg-gray-700/30 rounded-lg">
-              <p className="text-sm text-gray-300 leading-relaxed">
+              <p className="text-base text-gray-300 leading-relaxed">
                 <strong>Conclusión:</strong>{" "}
                 {metrics.risk.risk_score >= 75
                   ? "El análisis indica un riesgo ALTO de uso de asistencia externa. Se recomienda una investigación más detallada."

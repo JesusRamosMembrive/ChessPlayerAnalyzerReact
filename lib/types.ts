@@ -2,12 +2,16 @@ import { z } from "zod"
 
 // Schema for individual player list items, handling potential nulls
 export const PlayerListItemSchema = z.object({
-  id: z.string(),
+  id: z.string().optional(),
   username: z.string(),
-  status: z.enum(["pending", "in_progress", "completed", "failed"]),
-  created_at: z.string(),
+  status: z.enum(["pending", "in_progress", "completed", "failed", "ready"]),
+  created_at: z.string().optional(),
   finished_at: z.string().nullable().optional(),
   risk_score: z.number().nullable().optional(),
+  progress: z.number().optional(),
+  total_games: z.number().optional(),
+  done_games: z.number().optional(),
+  requested_at: z.string().optional(),
 })
 
 export type PlayerListItem = z.infer<typeof PlayerListItemSchema>

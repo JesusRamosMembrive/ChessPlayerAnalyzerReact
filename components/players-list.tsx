@@ -491,154 +491,166 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
           </div>
         ) : (
           <div className="space-y-3">
-            {players.map((player) => (
-              <div
-                key={player.username}
-                className={`flex items-center justify-between p-4 bg-gray-700/50 rounded-lg transition-colors cursor-pointer ${
-                  loadingPlayer === player.username ? "opacity-50 cursor-wait" : "hover:bg-gray-700"
-                }`}
-                onClick={() => handlePlayerClick(player.username)}
-              >
-                <div className="flex items-center space-x-3 flex-1">
-                  <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-white">{player.username[0].toUpperCase()}</span>
+            {players.map((player) => {
+              // Create a unique key that includes progress to force re-render
+              const progressKey = `${player.username}-${player.progress || 0}-${player.status}-${player._updateId || ""}`
+
+              return (
+                <div
+                  key={progressKey}
+                  className={`flex items-center justify-between p-4 bg-gray-700/50 rounded-lg transition-colors cursor-pointer ${
+                    loadingPlayer === player.username ? "opacity-50 cursor-wait" : "hover:bg-gray-700"
+                  }`}
+                  onClick={() => handlePlayerClick(player.username)}
+                >
+                  <div className="flex items-center space-x-3 flex-1">
+                    <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
+                      <span className="text-sm font-medium text-white">{player.username[0].toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <p className="font-medium text-white truncate">{player.username}</p>
+                        {getStatusBadge(player.status)}
+                        {loadingPlayer === player.username && (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        )}
+                      </div>
+
+                      {/* Progress bar for pending status */}
+                      {player.status === "pending" && player.progress !== undefined && (
+                        <div className="mb-2">
+                          <Progress
+                            key={`progress-${progressKey}`}
+                            value={Math.max(0, Math.min(100, player.progress))}
+                            className="h-2"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">
+                            {Math.round(Math.max(0, Math.min(100, player.progress)))}% complete
+                            {player.done_games && player.total_games && (
+                              <span className="ml-2">
+                                ({player.done_games}/{player.total_games} games)
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex items-center space-x-4 text-xs text-gray-400">
+                        {player.total_games && (
+                          <span className="flex items-center space-x-1">
+                            <span>Games: {player.total_games}</span>
+                          </span>
+                        )}
+
+                        {player.done_games && (
+                          <span className="flex items-center space-x-1">
+                            <span>Done: {player.done_games}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <p className="font-medium text-white truncate">{player.username}</p>
-                      {getStatusBadge(player.status)}
-                      {loadingPlayer === player.username && (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+
+                  <div className="flex items-center space-x-2">
+                    <div className="text-right text-xs text-gray-400">
+                      {player.finished_at ? (
+                        <div className="flex items-center space-x-1">
+                          <Calendar className="w-3 h-3" />
+                          <span>Finished: {formatDate(player.finished_at)}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-1">
+                          <Calendar className="w-3 h-3" />
+                          <span>Started: {formatDate(player.requested_at || "")}</span>
+                        </div>
                       )}
                     </div>
 
-                    {/* Progress bar for pending status */}
-                    {player.status === "pending" && player.progress !== undefined && (
-                      <div className="mb-2">
-                        <Progress
-                          key={`progress-${player.username}-${player.progress}`}
-                          value={player.progress}
-                          className="h-2"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">{Math.round(player.progress)}% complete</p>
-                      </div>
+                    {/* Botón de parar análisis (solo para status pending) */}
+                    {player.status === "pending" && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-orange-400 hover:text-orange-300 hover:bg-orange-500/20"
+                            disabled={stoppingPlayer === player.username}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {stoppingPlayer === player.username ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-400"></div>
+                            ) : (
+                              <Square className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="bg-gray-800 border-gray-700">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-white">¿Parar análisis?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-gray-400">
+                              Esta acción parará el análisis en curso de <strong>{player.username}</strong> y eliminará
+                              el jugador de la lista. Esta acción no se puede deshacer.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel className="bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
+                              Cancelar
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={(e) => handleStopAnalysis(player.username, e)}
+                              className="bg-orange-600 text-white hover:bg-orange-700"
+                            >
+                              Parar Análisis
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     )}
 
-                    <div className="flex items-center space-x-4 text-xs text-gray-400">
-                      {player.total_games && (
-                        <span className="flex items-center space-x-1">
-                          <span>Games: {player.total_games}</span>
-                        </span>
-                      )}
-
-                      {player.done_games && (
-                        <span className="flex items-center space-x-1">
-                          <span>Done: {player.done_games}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <div className="text-right text-xs text-gray-400">
-                    {player.finished_at ? (
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>Finished: {formatDate(player.finished_at)}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>Started: {formatDate(player.requested_at || "")}</span>
-                      </div>
+                    {/* Botón de borrar con confirmación (solo para status ready o error) */}
+                    {(player.status === "ready" || player.status === "error") && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                            disabled={deletingPlayer === player.username}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {deletingPlayer === player.username ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="bg-gray-800 border-gray-700">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-white">¿Eliminar jugador?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-gray-400">
+                              Esta acción eliminará permanentemente el análisis de <strong>{player.username}</strong>.
+                              Esta acción no se puede deshacer.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel className="bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
+                              Cancelar
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={(e) => handleDeletePlayer(player.username, e)}
+                              className="bg-red-600 text-white hover:bg-red-700"
+                            >
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     )}
                   </div>
-
-                  {/* Botón de parar análisis (solo para status pending) */}
-                  {player.status === "pending" && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-orange-400 hover:text-orange-300 hover:bg-orange-500/20"
-                          disabled={stoppingPlayer === player.username}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {stoppingPlayer === player.username ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-400"></div>
-                          ) : (
-                            <Square className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-gray-800 border-gray-700">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="text-white">¿Parar análisis?</AlertDialogTitle>
-                          <AlertDialogDescription className="text-gray-400">
-                            Esta acción parará el análisis en curso de <strong>{player.username}</strong> y eliminará el
-                            jugador de la lista. Esta acción no se puede deshacer.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
-                            Cancelar
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={(e) => handleStopAnalysis(player.username, e)}
-                            className="bg-orange-600 text-white hover:bg-orange-700"
-                          >
-                            Parar Análisis
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-
-                  {/* Botón de borrar con confirmación (solo para status ready o error) */}
-                  {(player.status === "ready" || player.status === "error") && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                          disabled={deletingPlayer === player.username}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {deletingPlayer === player.username ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-gray-800 border-gray-700">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="text-white">¿Eliminar jugador?</AlertDialogTitle>
-                          <AlertDialogDescription className="text-gray-400">
-                            Esta acción eliminará permanentemente el análisis de <strong>{player.username}</strong>.
-                            Esta acción no se puede deshacer.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
-                            Cancelar
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={(e) => handleDeletePlayer(player.username, e)}
-                            className="bg-red-600 text-white hover:bg-red-700"
-                          >
-                            Eliminar
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </CardContent>

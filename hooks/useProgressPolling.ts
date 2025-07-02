@@ -161,7 +161,7 @@ export function useProgressPolling({ players, setPlayers }: UseProgressPollingPr
         intervalRef.current = null
       }
     }
-  }, [pendingPlayers.length, isPolling, updatePlayersProgress])
+  }, [pendingPlayers.length, isPolling])
 
   // Cleanup on unmount
   useEffect(() => {

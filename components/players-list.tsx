@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { History, User, Calendar, RefreshCw, AlertCircle, Trash2 } from "lucide-react"
+import { History, User, Calendar, RefreshCw, AlertCircle, Trash2, Square } from "lucide-react"
 
 interface PlayersListProps {
   onError?: (error: any) => void
@@ -37,6 +37,7 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
   const [retryCount, setRetryCount] = useState(0)
   const [loadingPlayer, setLoadingPlayer] = useState<string | null>(null)
   const [deletingPlayer, setDeletingPlayer] = useState<string | null>(null)
+  const [stoppingPlayer, setStoppingPlayer] = useState<string | null>(null)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -168,7 +169,7 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
     if (loadingPlayer === username) return // Prevent double clicks
 
     // Check if player exists and if it's still being analyzed
-    const player = players.find(p => p.username === username)
+    const player = players.find((p) => p.username === username)
     if (player && player.status === "pending") {
       toast({
         title: "Player Still Analyzing",
@@ -236,6 +237,66 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
       })
     } finally {
       setLoadingPlayer(null)
+    }
+  }
+
+  const handleStopAnalysis = async (username: string, event: React.MouseEvent) => {
+    event.stopPropagation() // Prevent triggering player click
+
+    if (stoppingPlayer === username) return // Prevent double click
+
+    try {
+      setStoppingPlayer(username)
+      console.log(`Stopping analysis for player: ${username}`)
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+      const response = await fetch(`/api/players/${username}`, {
+        method: "PUT",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "stop" }),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("Stop analysis API error:", errorData)
+        throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      // Remove the player from the list after stopping analysis
+      setPlayers((prevPlayers) => prevPlayers.filter((player) => player.username !== username))
+
+      toast({
+        title: "Analysis Stopped",
+        description: `Analysis for ${username} has been stopped and removed`,
+      })
+    } catch (error: any) {
+      console.error(`Failed to stop analysis for ${username}:`, error)
+
+      let errorMessage = "Failed to stop analysis"
+
+      if (error.name === "AbortError" || error.name === "TimeoutError") {
+        errorMessage = "Request timeout - server may be slow"
+      } else if (error.message?.includes("Failed to fetch")) {
+        errorMessage = "Network error - unable to connect to API"
+      } else {
+        errorMessage = error.message || "Unknown error occurred"
+      }
+
+      toast({
+        title: "Error Stopping Analysis",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setStoppingPlayer(null)
     }
   }
 
@@ -454,10 +515,10 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
                     {/* Progress bar for pending status */}
                     {player.status === "pending" && player.progress !== undefined && (
                       <div className="mb-2">
-                        <Progress 
-                          key={`progress-${player.username}-${player.progress}`} 
-                          value={player.progress} 
-                          className="h-2" 
+                        <Progress
+                          key={`progress-${player.username}-${player.progress}`}
+                          value={player.progress}
+                          className="h-2"
                         />
                         <p className="text-xs text-gray-400 mt-1">{Math.round(player.progress)}% complete</p>
                       </div>
@@ -494,44 +555,87 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
                     )}
                   </div>
 
-                  {/* Botón de borrar con confirmación */}
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                        disabled={deletingPlayer === player.username}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {deletingPlayer === player.username ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-gray-800 border-gray-700">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-white">¿Eliminar jugador?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-gray-400">
-                          Esta acción eliminará permanentemente el análisis de <strong>{player.username}</strong>. Esta
-                          acción no se puede deshacer.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
-                          Cancelar
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={(e) => handleDeletePlayer(player.username, e)}
-                          className="bg-red-600 text-white hover:bg-red-700"
+                  {/* Botón de parar análisis (solo para status pending) */}
+                  {player.status === "pending" && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-orange-400 hover:text-orange-300 hover:bg-orange-500/20"
+                          disabled={stoppingPlayer === player.username}
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          Eliminar
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          {stoppingPlayer === player.username ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-400"></div>
+                          ) : (
+                            <Square className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-gray-800 border-gray-700">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-white">¿Parar análisis?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-gray-400">
+                            Esta acción parará el análisis en curso de <strong>{player.username}</strong> y eliminará el
+                            jugador de la lista. Esta acción no se puede deshacer.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
+                            Cancelar
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={(e) => handleStopAnalysis(player.username, e)}
+                            className="bg-orange-600 text-white hover:bg-orange-700"
+                          >
+                            Parar Análisis
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+
+                  {/* Botón de borrar con confirmación (solo para status ready o error) */}
+                  {(player.status === "ready" || player.status === "error") && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                          disabled={deletingPlayer === player.username}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {deletingPlayer === player.username ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-gray-800 border-gray-700">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-white">¿Eliminar jugador?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-gray-400">
+                            Esta acción eliminará permanentemente el análisis de <strong>{player.username}</strong>.
+                            Esta acción no se puede deshacer.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
+                            Cancelar
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={(e) => handleDeletePlayer(player.username, e)}
+                            className="bg-red-600 text-white hover:bg-red-700"
+                          >
+                            Eliminar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
               </div>
             ))}

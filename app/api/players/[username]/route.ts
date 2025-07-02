@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-const API_URL = "https://31cc-87-221-57-241.ngrok-free.app"
+const API_URL = "http:localhost:8000"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ username: string }> }) {
   try {

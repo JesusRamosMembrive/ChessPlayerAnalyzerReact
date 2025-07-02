@@ -247,7 +247,7 @@ export default function AnalysisResults() {
               <BarChart3 className="w-5 h-5 text-blue-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold">{metrics.games_analyzed}</div>
+              <div className="text-4xl font-bold text-green-500 ">{metrics.games_analyzed}</div>
               <p className="text-xs text-gray-500">
                 Del {new Date(metrics.first_game_date).toLocaleDateString()} al{" "}
                 {new Date(metrics.last_game_date).toLocaleDateString()}
@@ -260,7 +260,7 @@ export default function AnalysisResults() {
               <Gauge className="w-5 h-5 text-purple-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold">{formatNumber(metrics.avg_ipr, 0)}</div>
+              <div className="text-4xl font-bold text-green-500">{formatNumber(metrics.avg_ipr, 0)}</div>
               <p className="text-xs text-gray-500">ELO estimado según sus jugadas</p>
             </CardContent>
           </Card>
@@ -291,7 +291,7 @@ export default function AnalysisResults() {
                 Indicadores de la calidad y consistencia del juego.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <MetricDisplay
                 label="Pérdida Media de Centipeones (ACPL)"
                 value={formatNumber(metrics.avg_acpl)}

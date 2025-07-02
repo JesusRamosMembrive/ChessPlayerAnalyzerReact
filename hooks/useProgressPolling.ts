@@ -126,48 +126,35 @@ export function useProgressPolling({ players, setPlayers }: UseProgressPollingPr
   useEffect(() => {
     const hasPendingPlayers = pendingPlayers.length > 0
 
-    if (hasPendingPlayers) {
-      if (!isPolling) {
-        console.log(
-          "Starting progress polling for players:",
-          pendingPlayers.map((p) => p.username),
-        )
-        setIsPolling(true)
+    if (hasPendingPlayers && !isPolling) {
+      console.log(
+        "Starting progress polling for players:",
+        pendingPlayers.map((p) => p.username),
+      )
+      setIsPolling(true)
 
-        // Initial update
+      // Initial update
+      updatePlayersProgress()
+
+      // Set up interval - poll every 2 seconds
+      intervalRef.current = setInterval(() => {
         updatePlayersProgress()
+      }, 2000)
+    } else if (!hasPendingPlayers && isPolling) {
+      console.log("Stopping progress polling - no pending players")
+      setIsPolling(false)
 
-        // Set up interval - poll every 2 seconds
-        intervalRef.current = setInterval(() => {
-          console.log("Polling interval triggered")
-          updatePlayersProgress()
-        }, 2000)
-      }
-    } else {
-      if (isPolling) {
-        console.log("Stopping progress polling - no pending players")
-        setIsPolling(false)
-
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current)
-          intervalRef.current = null
-        }
-      }
-    }
-
-    return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
       }
     }
-  }, [pendingPlayers.length, isPolling])
+  }, [pendingPlayers.length, isPolling, updatePlayersProgress])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) {
-        console.log("Cleaning up progress polling on unmount")
         clearInterval(intervalRef.current)
       }
     }

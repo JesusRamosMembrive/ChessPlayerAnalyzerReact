@@ -13,9 +13,12 @@ interface UseProgressPollingProps {
 export function useProgressPolling({ players, setPlayers }: UseProgressPollingProps) {
   const [isPolling, setIsPolling] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const pendingPlayersRef = useRef<PlayerListItem[]>([])
 
   const pendingPlayers = useMemo(() => {
-    return players.filter((player) => player.status === "pending")
+    const filtered = players.filter((player) => player.status === "pending")
+    pendingPlayersRef.current = filtered
+    return filtered
   }, [players])
 
   const fetchPlayerProgress = useCallback(async (username: string): Promise<PlayerListItem | null> => {
@@ -47,16 +50,17 @@ export function useProgressPolling({ players, setPlayers }: UseProgressPollingPr
   }, [])
 
   const updatePlayersProgress = useCallback(async () => {
-    if (pendingPlayers.length === 0) {
+    const currentPendingPlayers = pendingPlayersRef.current
+    if (currentPendingPlayers.length === 0) {
       return
     }
 
     console.log(
-      `Polling progress for ${pendingPlayers.length} pending players:`,
-      pendingPlayers.map((p) => p.username),
+      `Polling progress for ${currentPendingPlayers.length} pending players:`,
+      currentPendingPlayers.map((p) => p.username),
     )
 
-    const updates = await Promise.allSettled(pendingPlayers.map((player) => fetchPlayerProgress(player.username)))
+    const updates = await Promise.allSettled(currentPendingPlayers.map((player) => fetchPlayerProgress(player.username)))
 
     setPlayers((currentPlayers) => {
       let hasUpdates = false
@@ -66,7 +70,7 @@ export function useProgressPolling({ players, setPlayers }: UseProgressPollingPr
         }
 
         // Find the corresponding update
-        const playerIndex = pendingPlayers.findIndex((p) => p.username === player.username)
+        const playerIndex = currentPendingPlayers.findIndex((p) => p.username === player.username)
         if (playerIndex === -1) {
           return player
         }
@@ -117,7 +121,7 @@ export function useProgressPolling({ players, setPlayers }: UseProgressPollingPr
 
       return currentPlayers
     })
-  }, [pendingPlayers, setPlayers, fetchPlayerProgress])
+  }, [setPlayers, fetchPlayerProgress])
 
   useEffect(() => {
     const hasPendingPlayers = pendingPlayers.length > 0

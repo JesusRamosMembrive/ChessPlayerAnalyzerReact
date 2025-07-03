@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server"
 import { AbortSignal } from "abort-controller"
-
-//const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http:localhost:8000"
-
-const API_URL = "http:localhost:8000"
+import { API_URL } from "../../constants"
 
 console.log("Attempting to connect to backend:", `${API_URL}/players`)
 
@@ -12,7 +9,7 @@ export async function GET() {
 
     console.log("Fetching players from API...")
     console.log("Attempting to connect to backend:", `${API_URL}/players`)
-    
+
     const response = await fetch(`${API_URL}/players`, {
       headers: {
         Accept: "application/json",
@@ -53,13 +50,13 @@ export async function GET() {
 
     const data = await response.json()
     console.log("Successfully fetched players:", Array.isArray(data) ? data.length : "invalid format")
-    
+
     console.log("API response status:", response.status)
     console.log("Received data:", data)
 
 
     return NextResponse.json(data)
-    
+
   } catch (error: any) {
     console.error("API route error:", error)
     console.error("Error details:", {

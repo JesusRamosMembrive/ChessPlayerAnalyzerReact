@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-
-const API_URL = "http:localhost:8000"
+import { API_URL } from "../../../constants"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ username: string }> }) {
   try {

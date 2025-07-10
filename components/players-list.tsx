@@ -250,7 +250,8 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
       console.log(`Stopping analysis for player: ${username}`)
 
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      // Increased timeout to 60 seconds for stop operation
+      const timeoutId = setTimeout(() => controller.abort(), 60000)
 
       const response = await fetch(`/api/players/${username}`, {
         method: "PUT",
@@ -267,6 +268,20 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         console.error("Stop analysis API error:", errorData)
+
+        // If the server returns 404, it means the player was already removed
+        if (response.status === 404) {
+          console.log(`Player '${username}' not found on server, removing from local list`)
+          // Remove the player from the list since it's no longer on the server
+          setPlayers((prevPlayers) => prevPlayers.filter((player) => player.username !== username))
+
+          toast({
+            title: "Analysis Stopped",
+            description: `Analysis for ${username} has been stopped and removed`,
+          })
+          return
+        }
+
         throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`)
       }
 
@@ -283,9 +298,20 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
       let errorMessage = "Failed to stop analysis"
 
       if (error.name === "AbortError" || error.name === "TimeoutError") {
-        errorMessage = "Request timeout - server may be slow"
+        errorMessage =
+          "Request timeout - the server is taking longer than expected to stop the analysis. Please try again."
       } else if (error.message?.includes("Failed to fetch")) {
         errorMessage = "Network error - unable to connect to API"
+      } else if (error.message?.includes("not found")) {
+        // If the error mentions "not found", remove the player from the list
+        console.log(`Player '${username}' not found, removing from local list`)
+        setPlayers((prevPlayers) => prevPlayers.filter((player) => player.username !== username))
+
+        toast({
+          title: "Analysis Stopped",
+          description: `Analysis for ${username} has been stopped and removed`,
+        })
+        return
       } else {
         errorMessage = error.message || "Unknown error occurred"
       }
@@ -590,6 +616,11 @@ export function PlayersList({ onError, onPlayerAdded }: PlayersListProps) {
                             <AlertDialogDescription className="text-gray-400">
                               Esta acción parará el análisis en curso de <strong>{player.username}</strong> y eliminará
                               el jugador de la lista. Esta acción no se puede deshacer.
+                              <br />
+                              <br />
+                              <em className="text-yellow-400">
+                                Nota: El servidor puede tardar hasta 1 minuto en detener el análisis.
+                              </em>
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

@@ -224,7 +224,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       console.log(`Full backend URL: ${backendUrl}`)
 
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      // Increased timeout to 90 seconds for stop operation on the server side
+      const timeoutId = setTimeout(() => controller.abort(), 90000)
 
       const response = await fetch(backendUrl, {
         method: "POST",
